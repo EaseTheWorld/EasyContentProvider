@@ -18,8 +18,8 @@ public class CheeseProvider extends EasyContentProvider {
 	
 	@Override
 	protected void onAddUriOps(UriOpsMatcher matcher) {
-		matcher.addUriOps(CheeseTable.TABLE_NAME);
-		matcher.addUriOps(CheeseTable.TABLE_NAME+"/#")
+		matcher.addUriOps(AUTHORITY, CheeseTable.TABLE_NAME);
+		matcher.addUriOps(AUTHORITY, CheeseTable.TABLE_NAME+"/#")
 			.setPathSegmentColumns(new String[] {CheeseTable.ID});
 	}
 	

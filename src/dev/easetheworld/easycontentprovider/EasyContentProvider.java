@@ -27,29 +27,27 @@ public abstract class EasyContentProvider extends ContentProvider {
 	private UriOpsMatcher mUriOpsMatcher;
 	
 	public class UriOpsMatcher {
-		private String mAuthority;
 		private UriMatcher mUriMatcher;
 		private List<UriOps> mOpsList;
 		
-		public UriOpsMatcher(String authority) {
-			mAuthority = authority;
+		public UriOpsMatcher() {
 			mUriMatcher = new UriMatcher(UriMatcher.NO_MATCH);
 			mOpsList = new ArrayList<UriOps>();
 		}
 		
 		// assume table name is the first segment of the path
-		public UriOps addUriOps(String path) {
+		public UriOps addUriOps(String authority, String path) {
 			String tableName = path;
 			int slashIndex = tableName.indexOf('/');
 			if (slashIndex >= 0)
 				tableName = tableName.substring(0, slashIndex);
-			return addUriOps(path, tableName);
+			return addUriOps(authority, path, tableName);
 		}
 		
-		public UriOps addUriOps(String path, String tableName) {
+		public UriOps addUriOps(String authority, String path, String tableName) {
 			UriOps ops = new UriOps(tableName);
-			ops.setContentType(getDefaultContentType(path, mAuthority));
-			mUriMatcher.addURI(mAuthority, path, mOpsList.size());
+			ops.setContentType(getDefaultContentType(path, authority));
+			mUriMatcher.addURI(authority, path, mOpsList.size());
 			mOpsList.add(ops);
 			return ops;
 		}
@@ -231,14 +229,14 @@ public abstract class EasyContentProvider extends ContentProvider {
 
 	@Override
 	public boolean onCreate() {
-		String authority = getAuthority();
-		android.util.Log.i("nora", "authority="+authority);
 		mDbHelper = onCreateSQLiteOpenHelper(getContext());
-		mUriOpsMatcher = new UriOpsMatcher(authority);
+		mUriOpsMatcher = new UriOpsMatcher();
 		onAddUriOps(mUriOpsMatcher);
 		return true;
 	}
 	
+	/*
+	 * authority should be available before onCreate, because it will be used in static class xxxTable's CONTENT_URI
 	private String getAuthority() {
 		try {
 			ComponentName cn = new ComponentName(getContext(), getClass());
@@ -250,6 +248,7 @@ public abstract class EasyContentProvider extends ContentProvider {
 		}
 		return null;
 	}
+	*/
 	
 	abstract protected SQLiteOpenHelper onCreateSQLiteOpenHelper(Context context);
 	
