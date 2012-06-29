@@ -2,8 +2,6 @@ package dev.easetheworld.easycontentprovider;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map.Entry;
-import java.util.Set;
 
 import android.content.ContentProvider;
 import android.content.ContentResolver;
@@ -24,6 +22,7 @@ public abstract class EasyContentProvider extends ContentProvider {
 	private SQLiteOpenHelper mDbHelper;
 	private UriOpsMatcher mUriOpsMatcher;
 	
+	// TODO add version history block
 	abstract protected SQLiteOpenHelper onCreateSQLiteOpenHelper(Context context);
 	abstract protected UriOps[] onCreateUriOps();
 
@@ -32,6 +31,16 @@ public abstract class EasyContentProvider extends ContentProvider {
 		mDbHelper = onCreateSQLiteOpenHelper(getContext());
 		mUriOpsMatcher = new UriOpsMatcher(onCreateUriOps());
 		return true;
+	}
+	
+	/**
+	 * This is like UriMatcher.match(uri) except this returns UriOps
+	 * 
+	 * @param uri
+	 * @return
+	 */
+	protected UriOps getUriOps(Uri uri) {
+		return mUriOpsMatcher.match(uri);
 	}
 	
 	private static class UriOpsMatcher {
@@ -45,10 +54,10 @@ public abstract class EasyContentProvider extends ContentProvider {
 			mUriOpsArray = uriOps;
 		}
 		
-		private UriOps getUriOps(Uri uri) {
+		private UriOps match(Uri uri) {
 			int code = mUriMatcher.match(uri);
 			if (code == -1)
-				throw new IllegalArgumentException("Unknown URL: " + uri.toString());
+				throw new IllegalArgumentException("Unknown URI: " + uri.toString());
 			else {
 				UriOps ops = mUriOpsArray[code];
 				return ops;
@@ -92,6 +101,14 @@ public abstract class EasyContentProvider extends ContentProvider {
 			mContentType = getDefaultContentType(authority, uriPath);
 		}
 		
+		public String getUriPath() {
+			return mUriPath;
+		}
+		
+		public String getTableName() {
+			return mTableName;
+		}
+		
 		public UriOps setContentType(String type) {
 			mContentType = type;
 			return this;
@@ -109,7 +126,6 @@ public abstract class EasyContentProvider extends ContentProvider {
 			mPermission = permission;
 			return this;
 		}
-		
 		
 		private String mUriSelection;
 		
@@ -141,7 +157,7 @@ public abstract class EasyContentProvider extends ContentProvider {
 		
 		private void checkPermission(int op) {
 			if ((mPermission & op) == 0)
-				throw new IllegalArgumentException("Unknown URL: " + mUriPath);
+				throw new UnsupportedOperationException(mUriPath);
 		}
 		
 		protected Cursor query(ContentResolver cr, SQLiteDatabase db, Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
@@ -153,52 +169,38 @@ public abstract class EasyContentProvider extends ContentProvider {
 			SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
 			qb.setTables(mTableName);
 			Cursor c = qb.query(db, projection, selection, selectionArgs, null, null, sortOrder);
-			if (c != null) {
+			if (c != null)
 				c.setNotificationUri(cr, uri);
-			}
 			return c;
 		}
 		
-		protected Uri insert(ContentResolver cr, SQLiteDatabase db, Uri uri, ContentValues values) {
-			return insert(cr, db, uri, values, true);
-		}
-		
-		protected Uri insert(ContentResolver cr, SQLiteDatabase db, Uri uri, ContentValues values, boolean notify) {
+		protected Uri insert(SQLiteDatabase db, Uri uri, ContentValues values) {
 			checkPermission(OP_INSERT);
 			
 			Uri newUri = null;
 			long rowId = db.insert(mTableName, null, values);
-			if (rowId >= 0) {
+			if (rowId >= 0)
 				newUri = ContentUris.withAppendedId(uri, rowId);
-				if (notify)
-					cr.notifyChange(uri, null);
-			}
 			return newUri;
 		}
 		
-		protected int update(ContentResolver cr, SQLiteDatabase db, Uri uri, ContentValues values, String selection, String[] selectionArgs) {
+		protected int update(SQLiteDatabase db, Uri uri, ContentValues values, String selection, String[] selectionArgs) {
 			checkPermission(OP_UPDATE);
 			
 			selection = appendUriSelection(selection);
 			selectionArgs = appendUriSelectionArgs(uri, selectionArgs);
 			
 			int rows = db.update(mTableName, values, selection, selectionArgs);
-			if (rows > 0) {
-				cr.notifyChange(uri, null);
-			}
 			return rows;
 		}
 		
-		protected int delete(ContentResolver cr, SQLiteDatabase db, Uri uri, String selection, String[] selectionArgs) {
+		protected int delete(SQLiteDatabase db, Uri uri, String selection, String[] selectionArgs) {
 			checkPermission(OP_DELETE);
 			
 			selection = appendUriSelection(selection);
 			selectionArgs = appendUriSelectionArgs(uri, selectionArgs);
 			
 			int rows = db.delete(mTableName, selection, selectionArgs);
-			if (rows > 0) {
-				cr.notifyChange(uri, null);
-			}
 			return rows;
 		}
 		
@@ -228,7 +230,7 @@ public abstract class EasyContentProvider extends ContentProvider {
 	     * Appends one set of selection args to another. This is useful when adding a selection
 	     * argument to a user provided set.
 	     */
-	    public static String[] appendSelectionArgs(String[] originalValues, String[] newValues) {
+	    private static String[] appendSelectionArgs(String[] originalValues, String[] newValues) {
 	        if (originalValues == null || originalValues.length == 0) {
 	            return newValues;
 	        }
@@ -291,14 +293,15 @@ public abstract class EasyContentProvider extends ContentProvider {
 	
 	@Override
 	public String getType(Uri uri) {
-		return mUriOpsMatcher.getUriOps(uri).mContentType;
+		return getUriOps(uri).mContentType;
 	}
 
 	@Override
 	public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
 		SQLiteDatabase db = mDbHelper.getReadableDatabase();
 		if (db == null) return null;
-		UriOps ops = mUriOpsMatcher.getUriOps(uri);
+		
+		UriOps ops = getUriOps(uri);
 		return ops.query(getContext().getContentResolver(), db, uri, projection, selection, selectionArgs, sortOrder);
 	}
 
@@ -307,8 +310,11 @@ public abstract class EasyContentProvider extends ContentProvider {
 		SQLiteDatabase db = mDbHelper.getWritableDatabase();
 		if (db == null) return null;
 		
-		UriOps ops = mUriOpsMatcher.getUriOps(uri);
-		return ops.insert(getContext().getContentResolver(), db, uri, values);
+		UriOps ops = getUriOps(uri);
+		Uri result = ops.insert(db, uri, values);
+		if (result != null)
+			getContext().getContentResolver().notifyChange(uri, null);
+		return result;
 	}
 
 	@Override
@@ -316,8 +322,11 @@ public abstract class EasyContentProvider extends ContentProvider {
 		SQLiteDatabase db = mDbHelper.getWritableDatabase();
 		if (db == null) return 0;
 		
-		UriOps ops = mUriOpsMatcher.getUriOps(uri);
-		return ops.update(getContext().getContentResolver(), db, uri, values, selection, selectionArgs);
+		UriOps ops = getUriOps(uri);
+		int result = ops.update(db, uri, values, selection, selectionArgs);
+		if (result >= 0)
+			getContext().getContentResolver().notifyChange(uri, null);
+		return result;
 	}
 	
 	@Override
@@ -325,8 +334,11 @@ public abstract class EasyContentProvider extends ContentProvider {
 		SQLiteDatabase db = mDbHelper.getWritableDatabase();
 		if (db == null) return 0;
 		
-		UriOps ops = mUriOpsMatcher.getUriOps(uri);
-		return ops.delete(getContext().getContentResolver(), db, uri, selection, selectionArgs);
+		UriOps ops = getUriOps(uri);
+		int result = ops.delete(db, uri, selection, selectionArgs);
+		if (result >= 0)
+			getContext().getContentResolver().notifyChange(uri, null);
+		return result;
 	}
 
 	@Override
@@ -335,22 +347,21 @@ public abstract class EasyContentProvider extends ContentProvider {
 		if (db == null) return 0;
 		
 		int result = 0;
-		UriOps ops = mUriOpsMatcher.getUriOps(uri);
+		UriOps ops = getUriOps(uri);
 		
 		// use DatabaseUtils.InsertHelper to reuse compiled sql statement
 		DatabaseUtils.InsertHelper insertHelper = new DatabaseUtils.InsertHelper(db, ops.mTableName);
 		db.beginTransaction();
 		try {
 	        for (int i = 0; i < values.length; i++) {
-	        	if (insertHelper.insert(values[i]) >= 0) {
+	        	if (insertHelper.insert(values[i]) >= 0)
 	        		result++;
-	        	}
 	        }
 	        db.setTransactionSuccessful();
 	    } finally {
 	        db.endTransaction();
 	        insertHelper.close();
-	    }	
+	    }
 		
         // notify once
         if (result > 0)
