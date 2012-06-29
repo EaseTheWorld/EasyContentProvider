@@ -2,6 +2,8 @@ package dev.easetheworld.easycontentprovider;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import android.content.ContentProvider;
 import android.content.ContentResolver;
@@ -10,6 +12,7 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.UriMatcher;
 import android.database.Cursor;
+import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.database.sqlite.SQLiteQueryBuilder;
@@ -48,7 +51,6 @@ public abstract class EasyContentProvider extends ContentProvider {
 				throw new IllegalArgumentException("Unknown URL: " + uri.toString());
 			else {
 				UriOps ops = mUriOpsArray[code];
-				android.util.Log.i("nora", "getUriOps code="+code+", uri="+uri+", type="+ops.mContentType);
 				return ops;
 			}
 		}
@@ -147,7 +149,6 @@ public abstract class EasyContentProvider extends ContentProvider {
 			
 			selection = appendUriSelection(selection);
 			selectionArgs = appendUriSelectionArgs(uri, selectionArgs);
-			android.util.Log.d("nora", "query selection = "+selection+", args="+selectionArgs);
 			
 			SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
 			qb.setTables(mTableName);
@@ -330,19 +331,51 @@ public abstract class EasyContentProvider extends ContentProvider {
 
 	@Override
 	public int bulkInsert(Uri uri, ContentValues[] values) {
+		/*
+		// METHOD 1 : default implementation
+		// 10 times slower than METHOD 2
+		return super.bulkInsert(uri, values); 
+		*/
+		
 		SQLiteDatabase db = mDbHelper.getWritableDatabase();
 		if (db == null) return 0;
 		
+		int result = 0;
 		UriOps ops = mUriOpsMatcher.getUriOps(uri);
 		
+		/*
+		// METHOD 2 : do not notify for insert iteration. after iteration notify just once.
+		// 2 times slower than METHOD 3
 		ContentResolver cr = getContext().getContentResolver();
-		int result = 0;
-        for (int i = 0; i < values.length; i++) {
-        	if (ops.insert(cr, db, uri, values[i], false) != null)
-        		result++;
-        }
+		db.beginTransaction();
+		try {
+	        for (int i = 0; i < values.length; i++) {
+	        	if (ops.insert(cr, db, uri, values[i], false) != null) // do not notify for every insert to increase performance.
+	        		result++;
+	        }
+	        db.setTransactionSuccessful();
+		} finally {
+	        db.endTransaction();
+		}
+		*/
+		
+		// METHOD 3 : use DatabaseUtils.InsertHelper to reuse compiled sql statement
+		DatabaseUtils.InsertHelper insertHelper = new DatabaseUtils.InsertHelper(db, ops.mTableName);
+		db.beginTransaction();
+		try {
+	        for (int i = 0; i < values.length; i++) {
+	        	if (insertHelper.insert(values[i]) >= 0)
+	        		result++;
+	        }
+	        db.setTransactionSuccessful();
+	    } finally {
+	        db.endTransaction();
+	        insertHelper.close();
+	    }	
+		
         // notify once
-		cr.notifyChange(uri, null);
+        if (result > 0)
+			getContext().getContentResolver().notifyChange(uri, null);
         return result;
 	}
 }

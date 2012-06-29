@@ -30,19 +30,17 @@ import com.easetheworld.easycontentprovidertest.CheeseProvider.CheeseTable;
 // from ApiDemos15
 public class Cheeses {
 	
-	public static class InsertRandomCheeseDataTask extends AsyncTask<Void, Integer, Void> {
+	public static class InsertRandomCheeseDataTask extends AsyncTask<Void, Void, Void> {
 		private ProgressDialog mProgress;
 		private Context mContext;
 		public InsertRandomCheeseDataTask(Context context) {
 			mContext = context;
 	        mProgress = new ProgressDialog(context);
-	        mProgress.setTitle("Test Data Loading...");
-	        mProgress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+	        mProgress.setMessage("Test Data Loading...");
 		}
 		
 		@Override
 		protected void onPreExecute() {
-	        mProgress.setMax(sCheeseStrings.length);
     		mProgress.show();
 		}
 
@@ -51,24 +49,19 @@ public class Cheeses {
 			mContext.getContentResolver().delete(CheeseTable.CONTENT_URI, null, null);
 			List<String> l = Arrays.asList(sCheeseStrings);
 			Collections.shuffle(l);
+			ContentValues[] cvs = new ContentValues[sCheeseStrings.length];
 			for (int i=0; i<sCheeseStrings.length; i++) {
 				ContentValues cv = new ContentValues();
 				cv.put(CheeseTable.NAME, l.get(i));
-				mContext.getContentResolver().insert(CheeseTable.CONTENT_URI, cv);
-				if (i % 10 == 0)
-					publishProgress(i);
+				cvs[i] = cv;
 			}
+			mContext.getContentResolver().bulkInsert(CheeseTable.CONTENT_URI, cvs);
 			return null;
 		}
 
 		@Override
 		protected void onPostExecute(Void result) {
     		mProgress.dismiss();
-		}
-
-		@Override
-		protected void onProgressUpdate(Integer... values) {
-			mProgress.setProgress(values[0]);
 		}
 	}
 
