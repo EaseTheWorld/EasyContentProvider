@@ -313,7 +313,7 @@ public abstract class EasyContentProvider extends ContentProvider {
 		UriOps ops = getUriOps(uri);
 		Uri result = ops.insert(db, uri, values);
 		if (result != null)
-			getContext().getContentResolver().notifyChange(uri, null);
+			getContext().getContentResolver().notifyChange(result, null);
 		return result;
 	}
 
