@@ -17,13 +17,15 @@ public class CheeseProvider extends EasyContentProvider {
 	}
 	
 	@Override
-	protected void onAddUriOps(UriOpsMatcher matcher) {
-		matcher.addUriOps(AUTHORITY, CheeseTable.TABLE_NAME);
-		matcher.addUriOps(AUTHORITY, CheeseTable.TABLE_NAME+"/#")
-			.setPathSegmentColumns(new String[] {CheeseTable.ID});
+	protected UriOps[] onCreateUriOps() {
+		return new UriOps[] {
+			new UriOps(AUTHORITY, CheeseTable.TABLE_NAME),
+			new UriOps(AUTHORITY, CheeseTable.TABLE_NAME+"/#") // '#' must be added before '*' because '*' includes '#' 
+				.setUriSelection(CheeseTable.ID+"=?"),
+			new UriOps(AUTHORITY, CheeseTable.TABLE_NAME+"/*")
+				.setUriSelection(CheeseTable.NAME+"=?"),
+		};
 	}
-	
-	
 
 	// Database Schema
 

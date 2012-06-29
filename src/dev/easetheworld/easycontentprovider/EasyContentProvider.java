@@ -3,53 +3,43 @@ package dev.easetheworld.easycontentprovider;
 import java.util.ArrayList;
 import java.util.List;
 
-import android.content.ComponentName;
 import android.content.ContentProvider;
-import android.content.ContentProviderOperation;
-import android.content.ContentProviderResult;
 import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Context;
-import android.content.OperationApplicationException;
 import android.content.UriMatcher;
-import android.content.pm.PackageManager.NameNotFoundException;
-import android.content.pm.ProviderInfo;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
+import android.text.TextUtils;
 
 public abstract class EasyContentProvider extends ContentProvider {
 	
 	private SQLiteOpenHelper mDbHelper;
 	private UriOpsMatcher mUriOpsMatcher;
 	
-	public class UriOpsMatcher {
+	abstract protected SQLiteOpenHelper onCreateSQLiteOpenHelper(Context context);
+	abstract protected UriOps[] onCreateUriOps();
+
+	@Override
+	public boolean onCreate() {
+		mDbHelper = onCreateSQLiteOpenHelper(getContext());
+		mUriOpsMatcher = new UriOpsMatcher(onCreateUriOps());
+		return true;
+	}
+	
+	private static class UriOpsMatcher {
 		private UriMatcher mUriMatcher;
-		private List<UriOps> mOpsList;
+		private UriOps[] mUriOpsArray;
 		
-		public UriOpsMatcher() {
+		private UriOpsMatcher(UriOps[] uriOps) {
 			mUriMatcher = new UriMatcher(UriMatcher.NO_MATCH);
-			mOpsList = new ArrayList<UriOps>();
-		}
-		
-		// assume table name is the first segment of the path
-		public UriOps addUriOps(String authority, String path) {
-			String tableName = path;
-			int slashIndex = tableName.indexOf('/');
-			if (slashIndex >= 0)
-				tableName = tableName.substring(0, slashIndex);
-			return addUriOps(authority, path, tableName);
-		}
-		
-		public UriOps addUriOps(String authority, String path, String tableName) {
-			UriOps ops = new UriOps(tableName);
-			ops.setContentType(getDefaultContentType(path, authority));
-			mUriMatcher.addURI(authority, path, mOpsList.size());
-			mOpsList.add(ops);
-			return ops;
+			for (int i=0; i<uriOps.length; i++)
+				mUriMatcher.addURI(uriOps[i].mAuthority, uriOps[i].mUriPath, i);
+			mUriOpsArray = uriOps;
 		}
 		
 		private UriOps getUriOps(Uri uri) {
@@ -57,55 +47,47 @@ public abstract class EasyContentProvider extends ContentProvider {
 			if (code == -1)
 				throw new IllegalArgumentException("Unknown URL: " + uri.toString());
 			else {
-				android.util.Log.i("nora", "getUriOps "+uri+", type="+mOpsList.get(code).getType());
-				return mOpsList.get(code);
+				UriOps ops = mUriOpsArray[code];
+				android.util.Log.i("nora", "getUriOps code="+code+", uri="+uri+", type="+ops.mContentType);
+				return ops;
 			}
 		}
 	}
-		
-	// if path is "cheeses", type is "vnd.android.cursor.dir/authority.cheeses"
-	// if path is "cheeses/#", type is "vnd.android.cursor.item/authority.cheeses"
-	// if path is "cheeses/#/sub", type is "vnd.android.cursor.dir/authority.cheeses.sub"
-	// if path is "cheeses/#/sub/#", type is "vnd.android.cursor.item/authority.cheeses.sub"
-	protected String getDefaultContentType(String path, String authority) {
-		StringBuilder sb = new StringBuilder();
-		if (path.endsWith("#")) {
-			sb.append("vnd.android.cursor.item/");
-		} else {
-			sb.append("vnd.android.cursor.dir/");
-		}
-		sb.append(authority);
-		if (path.contains("/")) {
-			String[] segments = path.split("/");
-			for (String segment : segments) {
-				if (segment.equals("#"))
-					continue;
-				sb.append(".");
-				sb.append(segment);
-			}
-		} else {
-			sb.append(".");
-			sb.append(path);
-		}
-		return sb.toString();
-	}
-	
-	public static final int OP_QUERY = 1;
-	public static final int OP_INSERT = 1<<1;
-	public static final int OP_UPDATE = 1<<2;
-	public static final int OP_DELETE = 1<<3;
-	public static final int OP_READ = OP_QUERY;
-	public static final int OP_WRITE = OP_INSERT | OP_UPDATE | OP_DELETE;
 	
 	public static class UriOps {
+		private String mAuthority;
+		private String mUriPath;
+		
 		private String mContentType;
 		private String mTableName;
-		private String[] mPathSegmentColumns;
 		
-		private int mPermission = OP_READ | OP_WRITE; // allow all operations by default
+		private List<Integer> mUriWildcardPosition;
+		private static boolean isUriWildcard(String s) {
+			// '#' : any number, '*' : any text
+			return "#*".indexOf(s) >= 0;
+		}
 		
-		private UriOps(String tableName) {
+		// assume table name is the first segment of the path
+		public UriOps(String authority, String uriPath) {
+			this(authority, uriPath, getFirstSegment(uriPath));
+		}
+		
+		public UriOps(String authority, String uriPath, String tableName) {
+			mAuthority = authority;
+			mUriPath = uriPath;
 			mTableName = tableName;
+			
+			// find the position of wild cards in uri path
+			String[] segments = uriPath.split("/");
+			for (int i=0; i<segments.length; i++) {
+				if (isUriWildcard(segments[i])) {
+					if (mUriWildcardPosition == null)
+						mUriWildcardPosition = new ArrayList<Integer>();
+					mUriWildcardPosition.add(i);
+				}
+			}
+			
+			mContentType = getDefaultContentType(authority, uriPath);
 		}
 		
 		public UriOps setContentType(String type) {
@@ -113,38 +95,62 @@ public abstract class EasyContentProvider extends ContentProvider {
 			return this;
 		}
 		
+		public static final int OP_QUERY = 1;
+		public static final int OP_INSERT = 1<<1;
+		public static final int OP_UPDATE = 1<<2;
+		public static final int OP_DELETE = 1<<3;
+		public static final int OP_READ = OP_QUERY;
+		public static final int OP_WRITE = OP_INSERT | OP_UPDATE | OP_DELETE;
+		private int mPermission = OP_READ | OP_WRITE; // allow all operations by default
+		
 		public UriOps setPermission(int permission) {
 			mPermission = permission;
 			return this;
 		}
 		
-		// To handle the uri including sub path segments like xxx/#/#. 
-		// paghSegmentColumns must have same size as uri.getPathSegments().size() - 1
-		// Set null for static segments.
-		// For example,
-		// if uri is table1/#/sub/#,
-		// pathSegmentColumns should be {"column1", null, "column2"}
-		public UriOps setPathSegmentColumns(String[] pathSegmentColumns) {
-			mPathSegmentColumns = pathSegmentColumns;
+		
+		private String mUriSelection;
+		
+		/**
+		 * To handle the uri including sub path segments like xxx/#/#.
+		 * Each '?' in selection will be matched to '#' or '*' in uri path.
+		 * @param selection
+		 * @return
+		 */
+		public UriOps setUriSelection(String... selection) {
+			if (selection != null) {
+				if (selection.length == 1) {
+					mUriSelection = selection[0];
+				} else {
+					StringBuilder sb = new StringBuilder();
+					for (int i=0; i<selection.length; i++) {
+						if (i == 0)
+							sb.append("(");
+						else
+							sb.append(" AND (");
+						sb.append(selection[i]);
+						sb.append(")");
+					}
+					mUriSelection = sb.toString();
+				}
+			}
 			return this;
 		}
 		
 		private void checkPermission(int op) {
 			if ((mPermission & op) == 0)
-				throw new SecurityException("Permission denied.");
+				throw new IllegalArgumentException("Unknown URL: " + mUriPath);
 		}
 		
 		protected Cursor query(ContentResolver cr, SQLiteDatabase db, Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
 			checkPermission(OP_QUERY);
 			
+			selection = appendUriSelection(selection);
+			selectionArgs = appendUriSelectionArgs(uri, selectionArgs);
+			android.util.Log.d("nora", "query selection = "+selection+", args="+selectionArgs);
+			
 			SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
 			qb.setTables(mTableName);
-			if (mPathSegmentColumns != null) {
-				for (int i=0; i<mPathSegmentColumns.length; i++) {
-					qb.appendWhere(mPathSegmentColumns[i]+ "=" + uri.getPathSegments().get(i+1));
-				}
-			}
-			android.util.Log.d("nora", "query uri="+uri.getPathSegments().size()+", "+uri.getPathSegments());
 			Cursor c = qb.query(db, projection, selection, selectionArgs, null, null, sortOrder);
 			if (c != null) {
 				c.setNotificationUri(cr, uri);
@@ -172,7 +178,9 @@ public abstract class EasyContentProvider extends ContentProvider {
 		protected int update(ContentResolver cr, SQLiteDatabase db, Uri uri, ContentValues values, String selection, String[] selectionArgs) {
 			checkPermission(OP_UPDATE);
 			
-			selection = appendPathSegmentSelection(selection, uri);
+			selection = appendUriSelection(selection);
+			selectionArgs = appendUriSelectionArgs(uri, selectionArgs);
+			
 			int rows = db.update(mTableName, values, selection, selectionArgs);
 			if (rows > 0) {
 				cr.notifyChange(uri, null);
@@ -183,7 +191,9 @@ public abstract class EasyContentProvider extends ContentProvider {
 		protected int delete(ContentResolver cr, SQLiteDatabase db, Uri uri, String selection, String[] selectionArgs) {
 			checkPermission(OP_DELETE);
 			
-			selection = appendPathSegmentSelection(selection, uri);
+			selection = appendUriSelection(selection);
+			selectionArgs = appendUriSelectionArgs(uri, selectionArgs);
+			
 			int rows = db.delete(mTableName, selection, selectionArgs);
 			if (rows > 0) {
 				cr.notifyChange(uri, null);
@@ -191,49 +201,78 @@ public abstract class EasyContentProvider extends ContentProvider {
 			return rows;
 		}
 		
-		protected int bulkInsert(ContentResolver cr, SQLiteDatabase db, Uri uri, ContentValues[] values) {
-			int numValues = values.length;
-	        for (int i = 0; i < numValues; i++) {
-	            insert(cr, db, uri, values[i], false);
-	        }
-			cr.notifyChange(uri, null);
-	        return numValues;
-		}
-		
-		private String getType() {
-			return mContentType;
-		}
-		
-		private String appendPathSegmentSelection(String selection, Uri uri) {
-			if (mPathSegmentColumns == null)
+		private String appendUriSelection(String selection) {
+			if (TextUtils.isEmpty(selection))
+				return mUriSelection;
+			else if (TextUtils.isEmpty(mUriSelection))
 				return selection;
-			
+			else
+		        return "(" + selection + ") AND (" + mUriSelection + ")";
+		}
+		
+		private String[] appendUriSelectionArgs(Uri uri, String[] selectionArgs) {
+			if (mUriSelection != null && mUriWildcardPosition != null) {
+				// concat selectionArgs and uriSelectionArgs
+				String[] uriSelectionArgs = new String[mUriWildcardPosition.size()];
+				List<String> segments = uri.getPathSegments();
+				for (int i=0; i<uriSelectionArgs.length; i++)
+					uriSelectionArgs[i] = segments.get(mUriWildcardPosition.get(i));
+				return appendSelectionArgs(selectionArgs, uriSelectionArgs);
+			} else
+				return selectionArgs;
+		}
+		
+		// from honeycomb DatabaseUtils.java
+		/**
+	     * Appends one set of selection args to another. This is useful when adding a selection
+	     * argument to a user provided set.
+	     */
+	    public static String[] appendSelectionArgs(String[] originalValues, String[] newValues) {
+	        if (originalValues == null || originalValues.length == 0) {
+	            return newValues;
+	        }
+	        String[] result = new String[originalValues.length + newValues.length];
+	        System.arraycopy(originalValues, 0, result, 0, originalValues.length);
+	        System.arraycopy(newValues, 0, result, originalValues.length, newValues.length);
+	        return result;
+	    }
+		
+		private static String getFirstSegment(String uriPath) {
+			String tableName = uriPath;
+			int slashIndex = tableName.indexOf('/');
+			if (slashIndex >= 0)
+				tableName = tableName.substring(0, slashIndex);
+			return tableName;
+		}
+		
+		// if path is "cheeses", type is "vnd.android.cursor.dir/authority.cheeses"
+		// if path is "cheeses/#", type is "vnd.android.cursor.item/authority.cheeses"
+		// if path is "cheeses/#/sub", type is "vnd.android.cursor.dir/authority.cheeses.sub"
+		// if path is "cheeses/#/sub/#", type is "vnd.android.cursor.item/authority.cheeses.sub"
+		private static String getDefaultContentType(String authority, String path) {
 			StringBuilder sb = new StringBuilder();
-			if (selection != null)
-				sb.append(selection);
-			for (int i=0; i<mPathSegmentColumns.length; i++) {
-				if (mPathSegmentColumns[i] == null)
-					continue;
-				if (sb.length() == 0)
-					sb.append("(");
-				else
-					sb.append(" AND (");
-				sb.append(mPathSegmentColumns[i]);
-				sb.append("=");
-				sb.append(uri.getPathSegments().get(i+1));
-				sb.append(")");
+			// check last character is wild card
+			if (isUriWildcard(path.substring(path.length()-1))) {
+				sb.append("vnd.android.cursor.item/");
+			} else {
+				sb.append("vnd.android.cursor.dir/");
+			}
+			sb.append(authority);
+			if (path.contains("/")) {
+				String[] segments = path.split("/");
+				for (String segment : segments) {
+					if (isUriWildcard(segment))
+						continue;
+					sb.append(".");
+					sb.append(segment);
+				}
+			} else {
+				sb.append(".");
+				sb.append(path);
 			}
 			return sb.toString();
 		}
-	}
-
-	@Override
-	public boolean onCreate() {
-		mDbHelper = onCreateSQLiteOpenHelper(getContext());
-		mUriOpsMatcher = new UriOpsMatcher();
-		onAddUriOps(mUriOpsMatcher);
-		return true;
-	}
+    }
 	
 	/*
 	 * authority should be available before onCreate, because it will be used in static class xxxTable's CONTENT_URI
@@ -243,20 +282,15 @@ public abstract class EasyContentProvider extends ContentProvider {
 			ProviderInfo pi = getContext().getPackageManager().getProviderInfo(cn, 0);
 			return pi.authority;
 		} catch (NameNotFoundException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		return null;
 	}
 	*/
 	
-	abstract protected SQLiteOpenHelper onCreateSQLiteOpenHelper(Context context);
-	
-	abstract protected void onAddUriOps(UriOpsMatcher matcher);
-	
 	@Override
 	public String getType(Uri uri) {
-		return mUriOpsMatcher.getUriOps(uri).getType();
+		return mUriOpsMatcher.getUriOps(uri).mContentType;
 	}
 
 	@Override
@@ -295,19 +329,20 @@ public abstract class EasyContentProvider extends ContentProvider {
 	}
 
 	@Override
-	public ContentProviderResult[] applyBatch(
-			ArrayList<ContentProviderOperation> operations)
-			throws OperationApplicationException {
-		// TODO Auto-generated method stub
-		return super.applyBatch(operations);
-	}
-
-	@Override
 	public int bulkInsert(Uri uri, ContentValues[] values) {
 		SQLiteDatabase db = mDbHelper.getWritableDatabase();
 		if (db == null) return 0;
 		
 		UriOps ops = mUriOpsMatcher.getUriOps(uri);
-		return ops.bulkInsert(getContext().getContentResolver(), db, uri, values);
+		
+		ContentResolver cr = getContext().getContentResolver();
+		int result = 0;
+        for (int i = 0; i < values.length; i++) {
+        	if (ops.insert(cr, db, uri, values[i], false) != null)
+        		result++;
+        }
+        // notify once
+		cr.notifyChange(uri, null);
+        return result;
 	}
 }

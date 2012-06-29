@@ -70,7 +70,9 @@ public class TestActivity extends FragmentActivity implements LoaderManager.Load
 
 	@Override
 	public Loader<Cursor> onCreateLoader(int id, Bundle args) {
-		return new CursorLoader(this, CheeseTable.CONTENT_URI, null, null, null, CheeseTable.ID);
+		return new CursorLoader(this, CheeseTable.CONTENT_URI, null, null, null, null);
+//		return new CursorLoader(this, Uri.withAppendedPath(CheeseTable.CONTENT_URI, "Kugelkase"), null, null, null, null);
+//		return new CursorLoader(this, Uri.withAppendedPath(CheeseTable.CONTENT_URI, "10"), null, null, null, null);
 	}
 
 	@Override
