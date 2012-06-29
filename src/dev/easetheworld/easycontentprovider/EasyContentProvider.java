@@ -331,41 +331,20 @@ public abstract class EasyContentProvider extends ContentProvider {
 
 	@Override
 	public int bulkInsert(Uri uri, ContentValues[] values) {
-		/*
-		// METHOD 1 : default implementation
-		// 10 times slower than METHOD 2
-		return super.bulkInsert(uri, values); 
-		*/
-		
 		SQLiteDatabase db = mDbHelper.getWritableDatabase();
 		if (db == null) return 0;
 		
 		int result = 0;
 		UriOps ops = mUriOpsMatcher.getUriOps(uri);
 		
-		/*
-		// METHOD 2 : do not notify for insert iteration. after iteration notify just once.
-		// 2 times slower than METHOD 3
-		ContentResolver cr = getContext().getContentResolver();
-		db.beginTransaction();
-		try {
-	        for (int i = 0; i < values.length; i++) {
-	        	if (ops.insert(cr, db, uri, values[i], false) != null) // do not notify for every insert to increase performance.
-	        		result++;
-	        }
-	        db.setTransactionSuccessful();
-		} finally {
-	        db.endTransaction();
-		}
-		*/
-		
-		// METHOD 3 : use DatabaseUtils.InsertHelper to reuse compiled sql statement
+		// use DatabaseUtils.InsertHelper to reuse compiled sql statement
 		DatabaseUtils.InsertHelper insertHelper = new DatabaseUtils.InsertHelper(db, ops.mTableName);
 		db.beginTransaction();
 		try {
 	        for (int i = 0; i < values.length; i++) {
-	        	if (insertHelper.insert(values[i]) >= 0)
+	        	if (insertHelper.insert(values[i]) >= 0) {
 	        		result++;
+	        	}
 	        }
 	        db.setTransactionSuccessful();
 	    } finally {

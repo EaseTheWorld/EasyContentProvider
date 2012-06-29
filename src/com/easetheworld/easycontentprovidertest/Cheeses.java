@@ -49,6 +49,7 @@ public class Cheeses {
 			mContext.getContentResolver().delete(CheeseTable.CONTENT_URI, null, null);
 			List<String> l = Arrays.asList(sCheeseStrings);
 			Collections.shuffle(l);
+			long t1 = System.currentTimeMillis();
 			ContentValues[] cvs = new ContentValues[sCheeseStrings.length];
 			for (int i=0; i<sCheeseStrings.length; i++) {
 				ContentValues cv = new ContentValues();
@@ -56,6 +57,8 @@ public class Cheeses {
 				cvs[i] = cv;
 			}
 			mContext.getContentResolver().bulkInsert(CheeseTable.CONTENT_URI, cvs);
+			long t2 = System.currentTimeMillis();
+			android.util.Log.e("nora", "insert "+sCheeseStrings.length+" in "+(t2-t1)+"ms");
 			return null;
 		}
 
