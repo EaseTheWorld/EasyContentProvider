@@ -2,7 +2,9 @@ package com.easetheworld.easycontentprovidertest;
 
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
+import android.os.ParcelFileDescriptor;
 import android.provider.BaseColumns;
+import dev.easetheworld.easycontentprovider.BaseUriOps;
 import dev.easetheworld.easycontentprovider.EasyContentProvider;
 
 public class CheeseProvider extends EasyContentProvider {
@@ -48,11 +50,23 @@ public class CheeseProvider extends EasyContentProvider {
 	@Override
 	protected UriOps[] onCreateUriOps() {
 		return new UriOps[] {
-			new UriOps(AUTHORITY, CheeseTable.TABLE_NAME),
-			new UriOps(AUTHORITY, CheeseTable.TABLE_NAME+"/#") // '#' must be added before '*' because '*' includes '#' 
+			new BaseUriOps(AUTHORITY, CheeseTable.TABLE_NAME),
+//			new OpenFileUriOps(AUTHORITY, "file/*"), // TODO
+			new BaseUriOps(AUTHORITY, CheeseTable.TABLE_NAME+"/#") // '#' must be added before '*' because '*' includes '#' 
 				.setUriSelection(CheeseTable.ID+"=?"),
-			new UriOps(AUTHORITY, CheeseTable.TABLE_NAME+"/*")
+			new BaseUriOps(AUTHORITY, CheeseTable.TABLE_NAME+"/*")
 				.setUriSelection(CheeseTable.NAME+"=?"),
 		};
+	}
+	
+	// TODO sample for extending UriOps
+	private static class OpenFileUriOps extends UriOps {
+		public OpenFileUriOps(String authority, String uriPath) {
+			super(authority, uriPath);
+		}
+
+		ParcelFileDescriptor openFile(Uri uri, String mode) {
+			return null;
+		}
 	}
 }
