@@ -6,6 +6,7 @@ import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.ContentValues;
 import android.database.Cursor;
+import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
@@ -100,6 +101,25 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 		return newUri;
 	}
 	
+	@Override
+	public int bulkInsert(SQLiteDatabase db, Uri uri, ContentValues[] values) {
+		int result = 0;
+		// use DatabaseUtils.InsertHelper to reuse compiled sql statement
+		DatabaseUtils.InsertHelper insertHelper = new DatabaseUtils.InsertHelper(db, mTableName);
+		db.beginTransaction();
+		try {
+			for (int i = 0; i < values.length; i++) {
+				if (insertHelper.insert(values[i]) >= 0)
+					result++;
+			}
+			db.setTransactionSuccessful();
+		} finally {
+			db.endTransaction();
+			insertHelper.close();
+		}
+		return result;
+	}
+
 	@Override
 	public int update(SQLiteDatabase db, Uri uri, ContentValues values, String selection, String[] selectionArgs) {
 		selection = appendUriSelection(selection);

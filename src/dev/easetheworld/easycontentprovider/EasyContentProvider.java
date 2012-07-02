@@ -148,6 +148,20 @@ public abstract class EasyContentProvider extends ContentProvider {
 	}
 
 	@Override
+	public int bulkInsert(Uri uri, ContentValues[] values) {
+		SQLiteDatabase db = mDbHelper.getWritableDatabase();
+		if (db == null) return 0;
+		
+		UriOps ops = getUriOps(uri);
+		int result = 0;
+		if (ops instanceof OpInsert)
+			result = ((OpInsert)ops).bulkInsert(db, uri, values);
+		if (result > 0)
+			getContext().getContentResolver().notifyChange(uri, null);
+		return result;
+	}
+
+	@Override
 	public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
 		SQLiteDatabase db = mDbHelper.getWritableDatabase();
 		if (db == null) return 0;
@@ -173,35 +187,6 @@ public abstract class EasyContentProvider extends ContentProvider {
 		if (result > 0)
 			getContext().getContentResolver().notifyChange(uri, null);
 		return result;
-	}
-
-	@Override
-	public int bulkInsert(Uri uri, ContentValues[] values) {
-		SQLiteDatabase db = mDbHelper.getWritableDatabase();
-		if (db == null) return 0;
-		
-		UriOps ops = getUriOps(uri);
-		int result = 0;
-		if (ops instanceof BaseUriOps) {
-			// use DatabaseUtils.InsertHelper to reuse compiled sql statement
-			DatabaseUtils.InsertHelper insertHelper = new DatabaseUtils.InsertHelper(db, ((BaseUriOps)ops).getTableName());
-			db.beginTransaction();
-			try {
-				for (int i = 0; i < values.length; i++) {
-					if (insertHelper.insert(values[i]) >= 0)
-						result++;
-				}
-				db.setTransactionSuccessful();
-			} finally {
-				db.endTransaction();
-				insertHelper.close();
-			}
-			
-	        // notify once
-	        if (result > 0)
-				getContext().getContentResolver().notifyChange(uri, null);
-		}
-        return result;
 	}
 	
 	protected static interface DatabaseHistory {
@@ -244,6 +229,7 @@ public abstract class EasyContentProvider extends ContentProvider {
 	
 	public static interface OpInsert {
 		Uri insert(SQLiteDatabase db, Uri uri, ContentValues values);
+		int bulkInsert(SQLiteDatabase db, Uri uri, ContentValues[] values);
 	}
 	
 	public static interface OpUpdate {
