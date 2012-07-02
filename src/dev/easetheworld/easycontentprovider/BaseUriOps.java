@@ -188,22 +188,18 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 		StringBuilder sb = new StringBuilder();
 		// check last character is wild card
 		if (isUriWildcard(path.substring(path.length()-1))) {
-			sb.append("vnd.android.cursor.item/");
+			sb.append(ContentResolver.CURSOR_ITEM_BASE_TYPE);
 		} else {
-			sb.append("vnd.android.cursor.dir/");
+			sb.append(ContentResolver.CURSOR_DIR_BASE_TYPE);
 		}
+		sb.append("/");
 		sb.append(authority);
-		if (path.contains("/")) {
-			String[] segments = path.split("/");
-			for (String segment : segments) {
-				if (isUriWildcard(segment))
-					continue;
-				sb.append(".");
-				sb.append(segment);
-			}
-		} else {
+		String[] segments = path.split("/");
+		for (String segment : segments) {
+			if (isUriWildcard(segment))
+				continue;
 			sb.append(".");
-			sb.append(path);
+			sb.append(segment);
 		}
 		return sb.toString();
 	}

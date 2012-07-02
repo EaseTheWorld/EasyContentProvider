@@ -3,6 +3,7 @@ package com.easetheworld.easycontentprovidertest;
 import java.io.FileNotFoundException;
 import java.util.List;
 
+import android.content.ContentResolver;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
@@ -16,7 +17,7 @@ public class CheeseProvider extends EasyContentProvider {
 	
 	public static class CheeseTable  {
 		public static final String TABLE_NAME = "cheese";
-		public static final Uri CONTENT_URI = Uri.withAppendedPath(Uri.parse("content://"+AUTHORITY), TABLE_NAME);
+		public static final Uri CONTENT_URI = new Uri.Builder().scheme(ContentResolver.SCHEME_CONTENT).authority(AUTHORITY).path(TABLE_NAME).build();
 		public static final String ID = BaseColumns._ID;
 		public static final String NAME = "name";
 		public static final String MEMO = "memo";
