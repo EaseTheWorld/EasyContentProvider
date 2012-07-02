@@ -19,7 +19,7 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ListView;
 
-import com.easetheworld.easycontentprovidertest.CheeseProvider.CheeseTable;
+import com.easetheworld.easycontentprovidertest.CheeseProvider.CheeseContract;
 
 public class TestActivity extends FragmentActivity implements LoaderManager.LoaderCallbacks<Cursor> {
 	
@@ -36,7 +36,7 @@ public class TestActivity extends FragmentActivity implements LoaderManager.Load
         
         mAdapter = new SimpleCursorAdapter(this,
                 android.R.layout.simple_list_item_2, null,
-                new String[] { CheeseTable.NAME, CheeseTable.MEMO },
+                new String[] { CheeseContract.NAME, CheeseContract.MEMO },
                 new int[] { android.R.id.text1, android.R.id.text2},
                 0); 
         lv.setAdapter(mAdapter);
@@ -72,7 +72,7 @@ public class TestActivity extends FragmentActivity implements LoaderManager.Load
 
 	@Override
 	public Loader<Cursor> onCreateLoader(int id, Bundle args) {
-		return new CursorLoader(this, CheeseTable.CONTENT_URI, null, null, null, null);
+		return new CursorLoader(this, CheeseContract.CONTENT_URI, null, null, null, null);
 //		return new CursorLoader(this, Uri.withAppendedPath(CheeseTable.CONTENT_URI, "Kugelkase"), null, null, null, null);
 //		return new CursorLoader(this, Uri.withAppendedPath(CheeseTable.CONTENT_URI, "10"), null, null, null, null);
 	}
@@ -114,7 +114,7 @@ public class TestActivity extends FragmentActivity implements LoaderManager.Load
     	AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo)item.getMenuInfo();
     	switch(item.getItemId()) {
     	case MENU_DELETE:
-	    	mQueryHandler.startDelete(0, null, Uri.withAppendedPath(CheeseTable.CONTENT_URI, ""+info.id), null, null);
+	    	mQueryHandler.startDelete(0, null, Uri.withAppendedPath(CheeseContract.CONTENT_URI, ""+info.id), null, null);
     		break;
     	case MENU_MEMO:
     		try {

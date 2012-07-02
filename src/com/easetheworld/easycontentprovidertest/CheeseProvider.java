@@ -15,7 +15,7 @@ public class CheeseProvider extends EasyContentProvider {
 
 	public static final String AUTHORITY = "com.easetheworld.easycontentprovidertest.provider";
 	
-	public static class CheeseTable  {
+	public static class CheeseContract  {
 		public static final String TABLE_NAME = "cheese";
 		public static final Uri CONTENT_URI = new Uri.Builder().scheme(ContentResolver.SCHEME_CONTENT).authority(AUTHORITY).path(TABLE_NAME).build();
 		public static final String ID = BaseColumns._ID;
@@ -34,17 +34,17 @@ public class CheeseProvider extends EasyContentProvider {
 			new DatabaseHistory() {
 				@Override
 				public void upgrade(SQLiteDatabase db) {
-					db.execSQL("CREATE TABLE IF NOT EXISTS " + CheeseTable.TABLE_NAME + "(" +
-							 CheeseTable.ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
-							 CheeseTable.NAME + " TEXT NOT NULL," +
-							 CheeseTable.MEMO + " TEXT" +
+					db.execSQL("CREATE TABLE IF NOT EXISTS " + CheeseContract.TABLE_NAME + "(" +
+							 CheeseContract.ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
+							 CheeseContract.NAME + " TEXT NOT NULL," +
+							 CheeseContract.MEMO + " TEXT" +
 							");");
 				}
 			},
 			new DatabaseHistory() {
 				@Override
 				public void upgrade(SQLiteDatabase db) {
-					db.execSQL("ALTER TABLE " + CheeseTable.TABLE_NAME + " ADD COLUMN " + CheeseTable.FLAG1 + " INTEGER;");
+					db.execSQL("ALTER TABLE " + CheeseContract.TABLE_NAME + " ADD COLUMN " + CheeseContract.FLAG1 + " INTEGER;");
 				}
 			},
 		};
@@ -54,11 +54,11 @@ public class CheeseProvider extends EasyContentProvider {
 	@Override
 	protected UriOps[] onCreateUriOps() {
 		return new UriOps[] {
-			new BaseUriOps(AUTHORITY, CheeseTable.TABLE_NAME),
-			new BaseUriOps(AUTHORITY, CheeseTable.TABLE_NAME+"/#") // '#' must be added before '*' because '*' includes '#' 
-				.setUriSelection(CheeseTable.ID+"=?"),
-			new BaseUriOps(AUTHORITY, CheeseTable.TABLE_NAME+"/*")
-				.setUriSelection(CheeseTable.NAME+"=?"),
+			new BaseUriOps(AUTHORITY, CheeseContract.TABLE_NAME),
+			new BaseUriOps(AUTHORITY, CheeseContract.TABLE_NAME+"/#") // '#' must be added before '*' because '*' includes '#' 
+				.setUriSelection(CheeseContract.ID+"=?"),
+			new BaseUriOps(AUTHORITY, CheeseContract.TABLE_NAME+"/*")
+				.setUriSelection(CheeseContract.NAME+"=?"),
 			new OpenFileUriOps(AUTHORITY, "file/*"),
 		};
 	}

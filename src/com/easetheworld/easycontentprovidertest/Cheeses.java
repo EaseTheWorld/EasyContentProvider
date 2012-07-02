@@ -25,7 +25,7 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.os.AsyncTask;
 
-import com.easetheworld.easycontentprovidertest.CheeseProvider.CheeseTable;
+import com.easetheworld.easycontentprovidertest.CheeseProvider.CheeseContract;
 
 // from ApiDemos15
 public class Cheeses {
@@ -46,17 +46,17 @@ public class Cheeses {
 
 		@Override
 		protected Void doInBackground(Void... params) {
-			mContext.getContentResolver().delete(CheeseTable.CONTENT_URI, null, null);
+			mContext.getContentResolver().delete(CheeseContract.CONTENT_URI, null, null);
 			List<String> l = Arrays.asList(sCheeseStrings);
 			Collections.shuffle(l);
 			long t1 = System.currentTimeMillis();
 			ContentValues[] cvs = new ContentValues[sCheeseStrings.length];
 			for (int i=0; i<sCheeseStrings.length; i++) {
 				ContentValues cv = new ContentValues();
-				cv.put(CheeseTable.NAME, l.get(i));
+				cv.put(CheeseContract.NAME, l.get(i));
 				cvs[i] = cv;
 			}
-			mContext.getContentResolver().bulkInsert(CheeseTable.CONTENT_URI, cvs);
+			mContext.getContentResolver().bulkInsert(CheeseContract.CONTENT_URI, cvs);
 			long t2 = System.currentTimeMillis();
 			android.util.Log.e("nora", "insert "+sCheeseStrings.length+" in "+(t2-t1)+"ms");
 			return null;
