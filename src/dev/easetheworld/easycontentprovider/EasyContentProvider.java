@@ -35,21 +35,13 @@ public abstract class EasyContentProvider extends ContentProvider {
 	}
 	
 	/**
-	 * get the proper interface from the UriOps for the uri
+	 * This is like UriMatcher.match(uri) except this returns UriOps
 	 * 
-	 * @param <T>
 	 * @param uri
-	 * @param clazz
-	 * @return if the uri is correct and the UriOps has the interface, return the interface. Otherwise throw exception. never null.
+	 * @return
 	 */
-	@SuppressWarnings("unchecked")
-	protected final <T> T getUriOp(Uri uri, Class<T> clazz) {
-		UriOps ops = mUriOpsMatcher.match(uri);
-		try {
-			return (T)ops;
-		} catch (ClassCastException e) {
-			throw new IllegalArgumentException("Unknown URI: " + uri.toString());
-		}
+	protected UriOps getUriOps(Uri uri) {
+		return mUriOpsMatcher.match(uri);
 	}
 	
 	private static class UriOpsMatcher {
@@ -124,7 +116,11 @@ public abstract class EasyContentProvider extends ContentProvider {
 		SQLiteDatabase db = mDbHelper.getReadableDatabase();
 		if (db == null) return null;
 		
-		return getUriOp(uri, OpQuery.class).query(getContext().getContentResolver(), db, uri, projection, selection, selectionArgs, sortOrder);
+		UriOps ops = getUriOps(uri);
+		Cursor result = null;
+		if (ops instanceof OpQuery)
+			result = ((OpQuery)ops).query(getContext().getContentResolver(), db, uri, projection, selection, selectionArgs, sortOrder);
+		return result;
 	}
 
 	@Override
@@ -132,7 +128,10 @@ public abstract class EasyContentProvider extends ContentProvider {
 		SQLiteDatabase db = mDbHelper.getWritableDatabase();
 		if (db == null) return null;
 		
-		Uri result = getUriOp(uri, OpInsert.class).insert(db, uri, values);
+		UriOps ops = getUriOps(uri);
+		Uri result = null;
+		if (ops instanceof OpInsert)
+			result = ((OpInsert)ops).insert(db, uri, values);
 		if (result != null)
 			getContext().getContentResolver().notifyChange(result, null);
 		return result;
@@ -143,7 +142,10 @@ public abstract class EasyContentProvider extends ContentProvider {
 		SQLiteDatabase db = mDbHelper.getWritableDatabase();
 		if (db == null) return 0;
 		
-		int result = getUriOp(uri, OpInsert.class).bulkInsert(db, uri, values);
+		UriOps ops = getUriOps(uri);
+		int result = 0;
+		if (ops instanceof OpInsert)
+			result = ((OpInsert)ops).bulkInsert(db, uri, values);
 		if (result > 0)
 			getContext().getContentResolver().notifyChange(uri, null);
 		return result;
@@ -154,7 +156,10 @@ public abstract class EasyContentProvider extends ContentProvider {
 		SQLiteDatabase db = mDbHelper.getWritableDatabase();
 		if (db == null) return 0;
 		
-		int result = getUriOp(uri, OpUpdate.class).update(db, uri, values, selection, selectionArgs);
+		UriOps ops = getUriOps(uri);
+		int result = 0;
+		if (ops instanceof OpUpdate)
+			result = ((OpUpdate)ops).update(db, uri, values, selection, selectionArgs);
 		if (result > 0)
 			getContext().getContentResolver().notifyChange(uri, null);
 		return result;
@@ -165,7 +170,10 @@ public abstract class EasyContentProvider extends ContentProvider {
 		SQLiteDatabase db = mDbHelper.getWritableDatabase();
 		if (db == null) return 0;
 		
-		int result = getUriOp(uri, OpDelete.class).delete(db, uri, selection, selectionArgs);
+		UriOps ops = getUriOps(uri);
+		int result = 0;
+		if (ops instanceof OpDelete)
+			result = ((OpDelete)ops).delete(db, uri, selection, selectionArgs);
 		if (result > 0)
 			getContext().getContentResolver().notifyChange(uri, null);
 		return result;
@@ -173,7 +181,11 @@ public abstract class EasyContentProvider extends ContentProvider {
 	
 	@Override
 	public String getType(Uri uri) {
-		return getUriOp(uri, OpGetType.class).getType();
+		UriOps ops = getUriOps(uri);
+		if (ops instanceof OpGetType)
+			return ((OpGetType)ops).getType();
+		else
+			return null;
 	}
 	
 	protected static interface DatabaseHistory {

@@ -1,5 +1,8 @@
 package com.easetheworld.easycontentprovidertest;
 
+import java.io.FileNotFoundException;
+import java.util.List;
+
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
@@ -51,22 +54,36 @@ public class CheeseProvider extends EasyContentProvider {
 	protected UriOps[] onCreateUriOps() {
 		return new UriOps[] {
 			new BaseUriOps(AUTHORITY, CheeseTable.TABLE_NAME),
-//			new OpenFileUriOps(AUTHORITY, "file/*"), // TODO
 			new BaseUriOps(AUTHORITY, CheeseTable.TABLE_NAME+"/#") // '#' must be added before '*' because '*' includes '#' 
 				.setUriSelection(CheeseTable.ID+"=?"),
 			new BaseUriOps(AUTHORITY, CheeseTable.TABLE_NAME+"/*")
 				.setUriSelection(CheeseTable.NAME+"=?"),
+			new OpenFileUriOps(AUTHORITY, "file/*"),
 		};
 	}
 	
-	// TODO sample for extending UriOps
+	// example of extending UriOps and using it.
 	private static class OpenFileUriOps extends UriOps {
 		public OpenFileUriOps(String authority, String uriPath) {
 			super(authority, uriPath);
 		}
 
 		ParcelFileDescriptor openFile(Uri uri, String mode) {
+			List<String> segments = uri.getPathSegments();
+			String arg = segments.get(mUriWildcardPosition.get(0)); // first wild card in uri
+			android.util.Log.i("OpenFileUriOps", "arg="+arg+", mode="+mode);
+			// open file or do something
 			return null;
 		}
+	}
+
+	@Override
+	public ParcelFileDescriptor openFile(Uri uri, String mode)
+			throws FileNotFoundException {
+		UriOps ops = getUriOps(uri);
+		if (ops instanceof OpenFileUriOps)
+			return ((OpenFileUriOps)ops).openFile(uri, mode);
+		else
+			return null;
 	}
 }

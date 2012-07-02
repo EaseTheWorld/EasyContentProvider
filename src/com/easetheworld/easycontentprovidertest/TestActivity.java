@@ -1,5 +1,7 @@
 package com.easetheworld.easycontentprovidertest;
 
+import java.io.FileNotFoundException;
+
 import android.content.AsyncQueryHandler;
 import android.database.Cursor;
 import android.net.Uri;
@@ -104,7 +106,7 @@ public class TestActivity extends FragmentActivity implements LoaderManager.Load
 	public void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo) {
 		super.onCreateContextMenu(menu, v, menuInfo);
 		menu.add(0, MENU_DELETE, 0, "Delete");
-//		menu.add(0, MENU_DELETE, 1, "Memo");
+		menu.add(0, MENU_MEMO, 1, "Memo");
 	}
 	
     @Override
@@ -112,9 +114,14 @@ public class TestActivity extends FragmentActivity implements LoaderManager.Load
     	AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo)item.getMenuInfo();
     	switch(item.getItemId()) {
     	case MENU_DELETE:
-	    	mQueryHandler.startDelete(0, null, Uri.withAppendedPath(CheeseTable.CONTENT_URI, "/"+info.id), null, null);
+	    	mQueryHandler.startDelete(0, null, Uri.withAppendedPath(CheeseTable.CONTENT_URI, ""+info.id), null, null);
     		break;
     	case MENU_MEMO:
+    		try {
+				getContentResolver().openFileDescriptor(Uri.parse("content://"+CheeseProvider.AUTHORITY+"/file/"+info.id), "r");
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+			}
     		break;
     	}
 		return super.onContextItemSelected(item);
