@@ -22,9 +22,14 @@ public abstract class EasyContentProvider extends ContentProvider {
 	private SQLiteOpenHelper mDbHelper;
 	private UriOpsMatcher mUriOpsMatcher;
 	
-	// TODO add version history block
-	abstract protected SQLiteOpenHelper onCreateSQLiteOpenHelper(Context context);
+	// If subclass wants to make its own SQLiteOpenHelper, override this.
+	protected SQLiteOpenHelper onCreateSQLiteOpenHelper(Context context) {
+		DatabaseHistory[] history = onCreateDatabaseHistory();
+		return new DatabaseHistoryBuilder(context, getClass().getSimpleName()+".db", history);
+	}
+	
 	abstract protected UriOps[] onCreateUriOps();
+	abstract protected DatabaseHistory[] onCreateDatabaseHistory();
 
 	@Override
 	public boolean onCreate() {
@@ -367,5 +372,39 @@ public abstract class EasyContentProvider extends ContentProvider {
         if (result > 0)
 			getContext().getContentResolver().notifyChange(uri, null);
         return result;
+	}
+	
+	protected static interface DatabaseHistory {
+		void upgrade(SQLiteDatabase db);
+	}
+	
+	private class DatabaseHistoryBuilder extends SQLiteOpenHelper {
+		
+		private DatabaseHistory[] mHistory;
+
+		public DatabaseHistoryBuilder(Context context, String name, DatabaseHistory[] history) {
+			super(context, name, null, history.length);
+			mHistory = history;
+			android.util.Log.i("nora", "dhh name="+name+", version="+history.length);
+		}
+
+		@Override
+		public void onCreate(SQLiteDatabase db) {
+			android.util.Log.i("nora", "dhh onCreate");
+			buildDatabaseHistory(db, 0, mHistory.length); // build from nothing
+		}
+
+		@Override
+		public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+			android.util.Log.i("nora", "dhh onUpgrade "+oldVersion+" -> "+newVersion);
+			buildDatabaseHistory(db, oldVersion, newVersion); // build from old version
+		}
+		
+		private void buildDatabaseHistory(SQLiteDatabase db, int oldVersion, int newVersion) {
+			for (int v=oldVersion; v<newVersion; v++) {
+				android.util.Log.i("nora", "dhh buildDatabaseHistory "+v);
+				mHistory[v].upgrade(db);
+			}
+		}
 	}
 }
