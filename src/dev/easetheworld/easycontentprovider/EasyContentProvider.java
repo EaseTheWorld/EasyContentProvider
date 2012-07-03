@@ -131,7 +131,9 @@ public abstract class EasyContentProvider extends ContentProvider {
 		UriOps ops = getUriOps(uri);
 		Uri result = null;
 		if (ops instanceof OpInsert)
-			result = ((OpInsert)ops).insert(getContext().getContentResolver(), db, uri, values);
+			result = ((OpInsert)ops).insert(db, uri, values);
+		if (result != null)
+			getContext().getContentResolver().notifyChange(result, null);
 		return result;
 	}
 
@@ -143,7 +145,9 @@ public abstract class EasyContentProvider extends ContentProvider {
 		UriOps ops = getUriOps(uri);
 		int result = 0;
 		if (ops instanceof OpInsert)
-			result = ((OpInsert)ops).bulkInsert(getContext().getContentResolver(), db, uri, values);
+			result = ((OpInsert)ops).bulkInsert(db, uri, values);
+		if (result > 0)
+			getContext().getContentResolver().notifyChange(uri, null);
 		return result;
 	}
 
@@ -155,7 +159,9 @@ public abstract class EasyContentProvider extends ContentProvider {
 		UriOps ops = getUriOps(uri);
 		int result = 0;
 		if (ops instanceof OpUpdate)
-			result = ((OpUpdate)ops).update(getContext().getContentResolver(), db, uri, values, selection, selectionArgs);
+			result = ((OpUpdate)ops).update(db, uri, values, selection, selectionArgs);
+		if (result > 0)
+			getContext().getContentResolver().notifyChange(uri, null);
 		return result;
 	}
 	
@@ -167,7 +173,9 @@ public abstract class EasyContentProvider extends ContentProvider {
 		UriOps ops = getUriOps(uri);
 		int result = 0;
 		if (ops instanceof OpDelete)
-			result = ((OpDelete)ops).delete(getContext().getContentResolver(), db, uri, selection, selectionArgs);
+			result = ((OpDelete)ops).delete(db, uri, selection, selectionArgs);
+		if (result > 0)
+			getContext().getContentResolver().notifyChange(uri, null);
 		return result;
 	}
 	
@@ -219,16 +227,16 @@ public abstract class EasyContentProvider extends ContentProvider {
 	}
 	
 	public static interface OpInsert {
-		Uri insert(ContentResolver cr, SQLiteDatabase db, Uri uri, ContentValues values);
-		int bulkInsert(ContentResolver cr, SQLiteDatabase db, Uri uri, ContentValues[] values);
+		Uri insert(SQLiteDatabase db, Uri uri, ContentValues values);
+		int bulkInsert(SQLiteDatabase db, Uri uri, ContentValues[] values);
 	}
 	
 	public static interface OpUpdate {
-		int update(ContentResolver cr, SQLiteDatabase db, Uri uri, ContentValues values, String selection, String[] selectionArgs);
+		int update(SQLiteDatabase db, Uri uri, ContentValues values, String selection, String[] selectionArgs);
 	}
 	
 	public static interface OpDelete {
-		int delete(ContentResolver cr, SQLiteDatabase db, Uri uri, String selection, String[] selectionArgs);
+		int delete(SQLiteDatabase db, Uri uri, String selection, String[] selectionArgs);
 	}
 	
 	public static interface OpGetType {

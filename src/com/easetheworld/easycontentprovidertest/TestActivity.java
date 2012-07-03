@@ -3,9 +3,6 @@ package com.easetheworld.easycontentprovidertest;
 import java.io.FileNotFoundException;
 
 import android.content.AsyncQueryHandler;
-import android.content.ContentUris;
-import android.content.Context;
-import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
@@ -71,15 +68,13 @@ public class TestActivity extends FragmentActivity implements LoaderManager.Load
 				super.onUpdateComplete(token, cookie, result);
 			}
 		};
-		
-		SharedPreferences pref = getSharedPreferences("abc", Context.MODE_PRIVATE);
-		pref.edit().putString("key1", "value1").apply();
     }
 
 	@Override
 	public Loader<Cursor> onCreateLoader(int id, Bundle args) {
 		return new CursorLoader(this, CheeseContract.CONTENT_URI, null, null, null, null);
-//		return new CursorLoader(this, ContentUris.withAppendedId(CheeseContract.CONTENT_URI, 2616), null, null, null, null);
+//		return new CursorLoader(this, Uri.withAppendedPath(CheeseTable.CONTENT_URI, "Kugelkase"), null, null, null, null);
+//		return new CursorLoader(this, Uri.withAppendedPath(CheeseTable.CONTENT_URI, "10"), null, null, null, null);
 	}
 
 	@Override
