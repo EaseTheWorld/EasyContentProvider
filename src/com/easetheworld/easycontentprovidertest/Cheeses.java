@@ -50,6 +50,23 @@ public class Cheeses {
 			List<String> l = Arrays.asList(sCheeseStrings);
 			Collections.shuffle(l);
 			long t1 = System.currentTimeMillis();
+			/*
+			// use applyBatch
+			ArrayList<ContentProviderOperation> list = new ArrayList<ContentProviderOperation>(sCheeseStrings.length);
+			for (int i=0; i<sCheeseStrings.length; i++) {
+				list.add(ContentProviderOperation.newInsert(CheeseContract.CONTENT_URI).withValue(CheeseContract.NAME, l.get(i)).build());
+			}
+			try {
+				mContext.getContentResolver().applyBatch(CheeseContract.CONTENT_URI.getAuthority(), list);
+			} catch (RemoteException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (OperationApplicationException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			*/
+			// use bulkInsert
 			ContentValues[] cvs = new ContentValues[sCheeseStrings.length];
 			for (int i=0; i<sCheeseStrings.length; i++) {
 				ContentValues cv = new ContentValues();
@@ -58,7 +75,7 @@ public class Cheeses {
 			}
 			mContext.getContentResolver().bulkInsert(CheeseContract.CONTENT_URI, cvs);
 			long t2 = System.currentTimeMillis();
-			android.util.Log.e("nora", "insert "+sCheeseStrings.length+" in "+(t2-t1)+"ms");
+			android.util.Log.i("InsertRandomCheeseDataTask", "insert "+sCheeseStrings.length+" cheese in "+(t2-t1)+"ms");
 			return null;
 		}
 

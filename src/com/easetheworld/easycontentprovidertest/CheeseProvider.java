@@ -29,6 +29,11 @@ public class CheeseProvider extends EasyContentProvider {
 	}
 	
 	@Override
+	protected String getAuthority() {
+		return AUTHORITY;
+	}
+
+	@Override
 	protected DatabaseHistory[] onCreateDatabaseHistory() {
 		DatabaseHistory[] history = new DatabaseHistory[] {
 			new DatabaseHistory() {
@@ -54,19 +59,19 @@ public class CheeseProvider extends EasyContentProvider {
 	@Override
 	protected UriOps[] onCreateUriOps() {
 		return new UriOps[] {
-			new BaseUriOps(AUTHORITY, CheeseContract.TABLE_NAME),
-			new BaseUriOps(AUTHORITY, CheeseContract.TABLE_NAME+"/#") // '#' must be added before '*' because '*' includes '#' 
+			new BaseUriOps(CheeseContract.TABLE_NAME),
+			new BaseUriOps(CheeseContract.TABLE_NAME+"/#") // '#' must be added before '*' because '*' includes '#' 
 				.setUriSelection(CheeseContract.ID+"=?"),
-			new BaseUriOps(AUTHORITY, CheeseContract.TABLE_NAME+"/*")
+			new BaseUriOps(CheeseContract.TABLE_NAME+"/*")
 				.setUriSelection(CheeseContract.NAME+"=?"),
-			new OpenFileUriOps(AUTHORITY, "file/*"),
+			new OpenFileUriOps("file/*"),
 		};
 	}
 	
 	// example of extending UriOps and using it.
 	private static class OpenFileUriOps extends UriOps {
-		public OpenFileUriOps(String authority, String uriPath) {
-			super(authority, uriPath);
+		public OpenFileUriOps(String uriPath) {
+			super(uriPath);
 		}
 
 		ParcelFileDescriptor openFile(Uri uri, String mode) {

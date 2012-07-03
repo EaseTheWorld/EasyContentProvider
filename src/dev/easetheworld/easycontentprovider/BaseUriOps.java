@@ -2,7 +2,6 @@ package dev.easetheworld.easycontentprovider;
 
 import java.util.List;
 
-import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.ContentValues;
 import android.database.Cursor;
@@ -12,20 +11,18 @@ import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
 import android.text.TextUtils;
 
-// basic database operations(query, insert, update, delete) and getType()
+// basic database operations(query, insert, update, delete)
 public class BaseUriOps extends EasyContentProvider.UriOps implements
 	EasyContentProvider.OpQuery,
 	EasyContentProvider.OpInsert,
 	EasyContentProvider.OpUpdate,
-	EasyContentProvider.OpDelete,
-	EasyContentProvider.OpGetType {
+	EasyContentProvider.OpDelete {
 	
-	private String mMimeType;
 	private String mTableName;
 	
 	// assume table name is the first segment of the path
-	public BaseUriOps(String authority, String uriPath) {
-		this(authority, uriPath, getFirstSegment(uriPath));
+	public BaseUriOps(String uriPath) {
+		this(uriPath, getFirstSegment(uriPath));
 	}
 	
 	private static String getFirstSegment(String uriPath) {
@@ -36,19 +33,13 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 		return tableName;
 	}
 	
-	public BaseUriOps(String authority, String uriPath, String tableName) {
-		super(authority, uriPath);
+	public BaseUriOps(String uriPath, String tableName) {
+		super(uriPath);
 		mTableName = tableName;
-		mMimeType = getDefaultType(authority, uriPath);
 	}
 	
 	public String getTableName() {
 		return mTableName;
-	}
-	
-	public BaseUriOps setType(String type) {
-		mMimeType = type;
-		return this;
 	}
 	
 	private String mUriSelection;
@@ -80,16 +71,13 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 	}
 	
 	@Override
-	public Cursor query(ContentResolver cr, SQLiteDatabase db, Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
+	public Cursor query(SQLiteDatabase db, Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
 		selection = appendUriSelection(selection);
 		selectionArgs = appendUriSelectionArgs(uri, selectionArgs);
 		
 		SQLiteQueryBuilder qb = new SQLiteQueryBuilder();
 		qb.setTables(mTableName);
-		Cursor c = qb.query(db, projection, selection, selectionArgs, null, null, sortOrder);
-		if (c != null)
-			c.setNotificationUri(cr, uri);
-		return c;
+		return qb.query(db, projection, selection, selectionArgs, null, null, sortOrder);
 	}
 	
 	@Override
@@ -125,8 +113,7 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 		selection = appendUriSelection(selection);
 		selectionArgs = appendUriSelectionArgs(uri, selectionArgs);
 		
-		int rows = db.update(mTableName, values, selection, selectionArgs);
-		return rows;
+		return db.update(mTableName, values, selection, selectionArgs);
 	}
 	
 	@Override
@@ -134,8 +121,7 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 		selection = appendUriSelection(selection);
 		selectionArgs = appendUriSelectionArgs(uri, selectionArgs);
 		
-		int rows = db.delete(mTableName, selection, selectionArgs);
-		return rows;
+		return db.delete(mTableName, selection, selectionArgs);
 	}
 	
 	private String appendUriSelection(String selection) {
@@ -173,34 +159,4 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
         System.arraycopy(newValues, 0, result, originalValues.length, newValues.length);
         return result;
     }
-	
-
-	@Override
-	public String getType() {
-		return mMimeType;
-	}
-	
-	// if path is "cheeses", type is "vnd.android.cursor.dir/authority.cheeses"
-	// if path is "cheeses/#", type is "vnd.android.cursor.item/authority.cheeses"
-	// if path is "cheeses/#/sub", type is "vnd.android.cursor.dir/authority.cheeses.sub"
-	// if path is "cheeses/#/sub/#", type is "vnd.android.cursor.item/authority.cheeses.sub"
-	private static String getDefaultType(String authority, String path) {
-		StringBuilder sb = new StringBuilder();
-		// check last character is wild card
-		if (isUriWildcard(path.substring(path.length()-1))) {
-			sb.append(ContentResolver.CURSOR_ITEM_BASE_TYPE);
-		} else {
-			sb.append(ContentResolver.CURSOR_DIR_BASE_TYPE);
-		}
-		sb.append("/");
-		sb.append(authority);
-		String[] segments = path.split("/");
-		for (String segment : segments) {
-			if (isUriWildcard(segment))
-				continue;
-			sb.append(".");
-			sb.append(segment);
-		}
-		return sb.toString();
-	}
 }

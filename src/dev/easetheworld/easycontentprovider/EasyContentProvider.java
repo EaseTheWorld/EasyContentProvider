@@ -4,9 +4,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import android.content.ContentProvider;
+import android.content.ContentProviderOperation;
+import android.content.ContentProviderResult;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.OperationApplicationException;
 import android.content.UriMatcher;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -15,22 +18,38 @@ import android.net.Uri;
 
 public abstract class EasyContentProvider extends ContentProvider {
 	
+	private Uri mAuthorityUri;
 	private SQLiteOpenHelper mDbHelper;
 	private UriOpsMatcher mUriOpsMatcher;
+	
+	/**
+	 * @return authority cannot be null.
+	 */
+	abstract protected String getAuthority();
+	
+	abstract protected UriOps[] onCreateUriOps();
+	
+	abstract protected DatabaseHistory[] onCreateDatabaseHistory();
 	
 	// If subclass wants to make its own SQLiteOpenHelper, override this.
 	protected SQLiteOpenHelper onCreateSQLiteOpenHelper(Context context) {
 		DatabaseHistory[] history = onCreateDatabaseHistory();
 		return new DatabaseHistoryBuilder(context, getClass().getSimpleName()+".db", history);
 	}
-	
-	abstract protected UriOps[] onCreateUriOps();
-	abstract protected DatabaseHistory[] onCreateDatabaseHistory();
 
 	@Override
 	public boolean onCreate() {
+		// check authority
+		String authority = getAuthority();
+		if (authority == null)
+			throw new IllegalStateException("Authority cannot be null");
+		mAuthorityUri = new Uri.Builder().scheme(ContentResolver.SCHEME_CONTENT).authority(authority).build();
+		
+		// create db
 		mDbHelper = onCreateSQLiteOpenHelper(getContext());
-		mUriOpsMatcher = new UriOpsMatcher(onCreateUriOps());
+		
+		// create uris
+		mUriOpsMatcher = new UriOpsMatcher(authority, onCreateUriOps());
 		return true;
 	}
 	
@@ -48,10 +67,14 @@ public abstract class EasyContentProvider extends ContentProvider {
 		private UriMatcher mUriMatcher;
 		private UriOps[] mUriOpsArray;
 		
-		private UriOpsMatcher(UriOps[] uriOps) {
+		private UriOpsMatcher(String authority, UriOps[] uriOps) {
 			mUriMatcher = new UriMatcher(UriMatcher.NO_MATCH);
-			for (int i=0; i<uriOps.length; i++)
-				mUriMatcher.addURI(uriOps[i].mAuthority, uriOps[i].mUriPath, i);
+			for (int i=0; i<uriOps.length; i++) {
+				UriOps ops = uriOps[i];
+				if (ops.getType() == null) // fill type
+					ops.setType(UriOps.getDefaultType(authority, ops.mUriPath));
+				mUriMatcher.addURI(authority, ops.mUriPath, i);
+			}
 			mUriOpsArray = uriOps;
 		}
 		
@@ -66,9 +89,8 @@ public abstract class EasyContentProvider extends ContentProvider {
 		}
 	}
 	
-	// default UriOps has no op.
+	// default UriOps has no op except getType.
 	public static class UriOps {
-		private String mAuthority;
 		private String mUriPath;
 		
 		protected List<Integer> mUriWildcardPosition;
@@ -77,8 +99,7 @@ public abstract class EasyContentProvider extends ContentProvider {
 			return "#*".indexOf(s) >= 0;
 		}
 		
-		public UriOps(String authority, String uriPath) {
-			mAuthority = authority;
+		public UriOps(String uriPath) {
 			mUriPath = uriPath;
 			
 			// find the position of wild cards in uri path
@@ -92,8 +113,43 @@ public abstract class EasyContentProvider extends ContentProvider {
 			}
 		}
 		
-		protected String getUriPath() {
+		protected final String getUriPath() {
 			return mUriPath;
+		}
+		
+		private String mType;
+		
+		public UriOps setType(String type) {
+			mType = type;
+			return this;
+		}
+		
+		public String getType() {
+			return mType;
+		}
+		
+		// if path is "cheeses", type is "vnd.android.cursor.dir/authority.cheeses"
+		// if path is "cheeses/#", type is "vnd.android.cursor.item/authority.cheeses"
+		// if path is "cheeses/#/sub", type is "vnd.android.cursor.dir/authority.cheeses.sub"
+		// if path is "cheeses/#/sub/#", type is "vnd.android.cursor.item/authority.cheeses.sub"
+		private static String getDefaultType(String authority, String path) {
+			StringBuilder sb = new StringBuilder();
+			// check last character is wild card
+			if (isUriWildcard(path.substring(path.length()-1))) {
+				sb.append(ContentResolver.CURSOR_ITEM_BASE_TYPE);
+			} else {
+				sb.append(ContentResolver.CURSOR_DIR_BASE_TYPE);
+			}
+			sb.append("/");
+			sb.append(authority);
+			String[] segments = path.split("/");
+			for (String segment : segments) {
+				if (isUriWildcard(segment))
+					continue;
+				sb.append(".");
+				sb.append(segment);
+			}
+			return sb.toString();
 		}
     }
 	
@@ -119,7 +175,10 @@ public abstract class EasyContentProvider extends ContentProvider {
 		UriOps ops = getUriOps(uri);
 		Cursor result = null;
 		if (ops instanceof OpQuery)
-			result = ((OpQuery)ops).query(getContext().getContentResolver(), db, uri, projection, selection, selectionArgs, sortOrder);
+			result = ((OpQuery)ops).query(db, uri, projection, selection, selectionArgs, sortOrder);
+		
+		if (result != null)
+			result.setNotificationUri(getContext().getContentResolver(), uri);
 		return result;
 	}
 
@@ -132,8 +191,9 @@ public abstract class EasyContentProvider extends ContentProvider {
 		Uri result = null;
 		if (ops instanceof OpInsert)
 			result = ((OpInsert)ops).insert(db, uri, values);
+		
 		if (result != null)
-			getContext().getContentResolver().notifyChange(result, null);
+			notifyChange(result);
 		return result;
 	}
 
@@ -146,8 +206,9 @@ public abstract class EasyContentProvider extends ContentProvider {
 		int result = 0;
 		if (ops instanceof OpInsert)
 			result = ((OpInsert)ops).bulkInsert(db, uri, values);
+		
 		if (result > 0)
-			getContext().getContentResolver().notifyChange(uri, null);
+			notifyChange(uri);
 		return result;
 	}
 
@@ -160,8 +221,9 @@ public abstract class EasyContentProvider extends ContentProvider {
 		int result = 0;
 		if (ops instanceof OpUpdate)
 			result = ((OpUpdate)ops).update(db, uri, values, selection, selectionArgs);
+		
 		if (result > 0)
-			getContext().getContentResolver().notifyChange(uri, null);
+			notifyChange(uri);
 		return result;
 	}
 	
@@ -174,20 +236,50 @@ public abstract class EasyContentProvider extends ContentProvider {
 		int result = 0;
 		if (ops instanceof OpDelete)
 			result = ((OpDelete)ops).delete(db, uri, selection, selectionArgs);
+		
 		if (result > 0)
-			getContext().getContentResolver().notifyChange(uri, null);
+			notifyChange(uri);
 		return result;
 	}
 	
 	@Override
 	public String getType(Uri uri) {
-		UriOps ops = getUriOps(uri);
-		if (ops instanceof OpGetType)
-			return ((OpGetType)ops).getType();
-		else
-			return null;
+		return getUriOps(uri).getType();
 	}
 	
+	private final ThreadLocal<Boolean> mApplyingBatch = new ThreadLocal<Boolean>();
+	
+	@Override
+	public ContentProviderResult[] applyBatch(
+			ArrayList<ContentProviderOperation> operations)
+			throws OperationApplicationException {
+		// get db for write
+		SQLiteDatabase db = mDbHelper.getWritableDatabase();
+		if (db == null) return null;
+		
+		ContentProviderResult[] result;
+		db.beginTransaction();
+		try {
+			mApplyingBatch.set(true); // insert, delete, update shouldn't notify
+			result = super.applyBatch(operations);
+			db.setTransactionSuccessful();
+		} finally {
+			mApplyingBatch.set(false);
+			db.endTransaction();
+		}
+		
+		notifyChange(mAuthorityUri);
+		return result;
+	}
+	
+	protected boolean notifyChange(Uri uri) {
+		Boolean b = mApplyingBatch.get();
+		if (b != null && b) return false; // is in applyBatch
+		
+		getContext().getContentResolver().notifyChange(uri, null);
+		return true;
+	}
+
 	protected static interface DatabaseHistory {
 		void upgrade(SQLiteDatabase db);
 	}
@@ -199,31 +291,27 @@ public abstract class EasyContentProvider extends ContentProvider {
 		public DatabaseHistoryBuilder(Context context, String name, DatabaseHistory[] history) {
 			super(context, name, null, history.length);
 			mHistory = history;
-			android.util.Log.i("nora", "dhh name="+name+", version="+history.length);
 		}
 
 		@Override
 		public void onCreate(SQLiteDatabase db) {
-			android.util.Log.i("nora", "dhh onCreate");
 			buildDatabaseHistory(db, 0, mHistory.length); // build from nothing
 		}
 
 		@Override
 		public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-			android.util.Log.i("nora", "dhh onUpgrade "+oldVersion+" -> "+newVersion);
 			buildDatabaseHistory(db, oldVersion, newVersion); // build from old version
 		}
 		
 		private void buildDatabaseHistory(SQLiteDatabase db, int oldVersion, int newVersion) {
 			for (int v=oldVersion; v<newVersion; v++) {
-				android.util.Log.i("nora", "dhh buildDatabaseHistory "+v);
 				mHistory[v].upgrade(db);
 			}
 		}
 	}
 	
 	public static interface OpQuery {
-		Cursor query(ContentResolver cr, SQLiteDatabase db, Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder);
+		Cursor query(SQLiteDatabase db, Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder);
 	}
 	
 	public static interface OpInsert {
@@ -237,9 +325,5 @@ public abstract class EasyContentProvider extends ContentProvider {
 	
 	public static interface OpDelete {
 		int delete(SQLiteDatabase db, Uri uri, String selection, String[] selectionArgs);
-	}
-	
-	public static interface OpGetType {
-		String getType();
 	}
 }
