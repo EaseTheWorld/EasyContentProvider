@@ -93,16 +93,18 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 	}
 	
 	@Override
-	public Uri insert(SQLiteDatabase db, Uri uri, ContentValues values) {
+	public Uri insert(ContentResolver cr, SQLiteDatabase db, Uri uri, ContentValues values) {
 		Uri newUri = null;
 		long rowId = db.insert(mTableName, null, values);
-		if (rowId >= 0)
+		if (rowId >= 0) {
 			newUri = ContentUris.withAppendedId(uri, rowId);
+			cr.notifyChange(newUri, null);
+		}
 		return newUri;
 	}
 	
 	@Override
-	public int bulkInsert(SQLiteDatabase db, Uri uri, ContentValues[] values) {
+	public int bulkInsert(ContentResolver cr, SQLiteDatabase db, Uri uri, ContentValues[] values) {
 		int result = 0;
 		// use DatabaseUtils.InsertHelper to reuse compiled sql statement
 		DatabaseUtils.InsertHelper insertHelper = new DatabaseUtils.InsertHelper(db, mTableName);
@@ -113,6 +115,8 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 					result++;
 			}
 			db.setTransactionSuccessful();
+			if (result > 0)
+				cr.notifyChange(uri, null);
 		} finally {
 			db.endTransaction();
 			insertHelper.close();
@@ -121,20 +125,24 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 	}
 
 	@Override
-	public int update(SQLiteDatabase db, Uri uri, ContentValues values, String selection, String[] selectionArgs) {
+	public int update(ContentResolver cr, SQLiteDatabase db, Uri uri, ContentValues values, String selection, String[] selectionArgs) {
 		selection = appendUriSelection(selection);
 		selectionArgs = appendUriSelectionArgs(uri, selectionArgs);
 		
 		int rows = db.update(mTableName, values, selection, selectionArgs);
+		if (rows > 0)
+			cr.notifyChange(uri, null);
 		return rows;
 	}
 	
 	@Override
-	public int delete(SQLiteDatabase db, Uri uri, String selection, String[] selectionArgs) {
+	public int delete(ContentResolver cr, SQLiteDatabase db, Uri uri, String selection, String[] selectionArgs) {
 		selection = appendUriSelection(selection);
 		selectionArgs = appendUriSelectionArgs(uri, selectionArgs);
 		
 		int rows = db.delete(mTableName, selection, selectionArgs);
+		if (rows > 0)
+			cr.notifyChange(uri, null);
 		return rows;
 	}
 	
