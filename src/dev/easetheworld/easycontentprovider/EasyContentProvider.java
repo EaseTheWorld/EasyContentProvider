@@ -253,7 +253,6 @@ public abstract class EasyContentProvider extends ContentProvider {
 	public ContentProviderResult[] applyBatch(
 			ArrayList<ContentProviderOperation> operations)
 			throws OperationApplicationException {
-		// get db for write
 		SQLiteDatabase db = mDbHelper.getWritableDatabase();
 		if (db == null) return null;
 		

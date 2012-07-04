@@ -9,6 +9,8 @@ import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
+import android.os.Binder;
+import android.os.Process;
 import android.text.TextUtils;
 
 // basic database operations(query, insert, update, delete)
@@ -19,6 +21,10 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 	EasyContentProvider.OpDelete {
 	
 	private String mTableName;
+	
+	private static int PERMISSION_READ = 1<<0;
+	private static int PERMISSION_WRITE = 1<<1;
+	private int mPermission = PERMISSION_READ | PERMISSION_WRITE;
 	
 	// assume table name is the first segment of the path
 	public BaseUriOps(String uriPath) {
@@ -70,8 +76,21 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 		return this;
 	}
 	
+	public BaseUriOps setPermission(boolean isReadable, boolean isWritable) {
+		mPermission = (isReadable ? PERMISSION_READ : 0) | (isWritable ? PERMISSION_WRITE : 0);
+		return this;
+	}
+	
+	private void enforcePermission(int permission) {
+		if (Binder.getCallingUid() == Process.myUid()) return; // Myself is always allowed.
+		if ((mPermission & permission) == 0)
+			throw new SecurityException("Permission Denied");
+	}
+	
 	@Override
 	public Cursor query(SQLiteDatabase db, Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
+		enforcePermission(PERMISSION_READ);
+		
 		selection = appendUriSelection(selection);
 		selectionArgs = appendUriSelectionArgs(uri, selectionArgs);
 		
@@ -82,6 +101,8 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 	
 	@Override
 	public Uri insert(SQLiteDatabase db, Uri uri, ContentValues values) {
+		enforcePermission(PERMISSION_WRITE);
+		
 		Uri newUri = null;
 		long rowId = db.insert(mTableName, null, values);
 		if (rowId >= 0)
@@ -91,6 +112,8 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 	
 	@Override
 	public int bulkInsert(SQLiteDatabase db, Uri uri, ContentValues[] values) {
+		enforcePermission(PERMISSION_WRITE);
+		
 		int result = 0;
 		// use DatabaseUtils.InsertHelper to reuse compiled sql statement
 		DatabaseUtils.InsertHelper insertHelper = new DatabaseUtils.InsertHelper(db, mTableName);
@@ -110,6 +133,8 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 
 	@Override
 	public int update(SQLiteDatabase db, Uri uri, ContentValues values, String selection, String[] selectionArgs) {
+		enforcePermission(PERMISSION_WRITE);
+		
 		selection = appendUriSelection(selection);
 		selectionArgs = appendUriSelectionArgs(uri, selectionArgs);
 		
@@ -118,6 +143,8 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 	
 	@Override
 	public int delete(SQLiteDatabase db, Uri uri, String selection, String[] selectionArgs) {
+		enforcePermission(PERMISSION_WRITE);
+		
 		selection = appendUriSelection(selection);
 		selectionArgs = appendUriSelectionArgs(uri, selectionArgs);
 		
