@@ -1,3 +1,21 @@
+/*
+ * Copyright (C) 2012 EaseTheWorld
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
+ * https://github.com/EaseTheWorld/EasyContentProvider
+ */
+
 package dev.easetheworld.easycontentprovider;
 
 import java.util.List;
@@ -13,7 +31,9 @@ import android.os.Binder;
 import android.os.Process;
 import android.text.TextUtils;
 
-// basic database operations(query, insert, update, delete)
+/**
+ * Support basic database operations(query, insert, update, delete)
+ */
 public class BaseUriOps extends EasyContentProvider.UriOps implements
 	EasyContentProvider.OpQuery,
 	EasyContentProvider.OpInsert,
@@ -22,13 +42,22 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 	
 	private String mTableName;
 	
-	private static int PERMISSION_READ = 1<<0;
-	private static int PERMISSION_WRITE = 1<<1;
-	private int mPermission = PERMISSION_READ | PERMISSION_WRITE;
-	
-	// assume table name is the first segment of the path
+	/**
+	 * Simple constructor. 
+	 * @param uriPath uri(excluding authority) that matched to this operations. (assume table name is the first segment of the path)
+	 */
 	public BaseUriOps(String uriPath) {
 		this(uriPath, getFirstSegment(uriPath));
+	}
+	
+	/**
+	 * Constructor.
+	 * @param uriPath uri(excluding authority) that matched to this operations.
+	 * @param tableName this is used for all db operations.
+	 */
+	public BaseUriOps(String uriPath, String tableName) {
+		super(uriPath);
+		mTableName = tableName;
 	}
 	
 	private static String getFirstSegment(String uriPath) {
@@ -37,11 +66,6 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 		if (slashIndex >= 0)
 			tableName = tableName.substring(0, slashIndex);
 		return tableName;
-	}
-	
-	public BaseUriOps(String uriPath, String tableName) {
-		super(uriPath);
-		mTableName = tableName;
 	}
 	
 	public String getTableName() {
@@ -76,6 +100,19 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 		return this;
 	}
 	
+	private static int PERMISSION_READ = 1<<0;
+	private static int PERMISSION_WRITE = 1<<1;
+	private int mPermission = PERMISSION_READ | PERMISSION_WRITE;
+	
+	/**
+	 * Set permission to this operations for other apps.
+	 * The app which declares this provider is always allowed for this operations.
+	 * If you want to make this uri private, set isReadable and isWritable false. 
+	 * 
+	 * @param isReadable if true, query is allowed.
+	 * @param isWritable if true, insert/update/delete are allowed.
+	 * @return
+	 */
 	public BaseUriOps setPermission(boolean isReadable, boolean isWritable) {
 		mPermission = (isReadable ? PERMISSION_READ : 0) | (isWritable ? PERMISSION_WRITE : 0);
 		return this;

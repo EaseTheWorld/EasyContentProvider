@@ -1,3 +1,21 @@
+/*
+ * Copyright (C) 2012 EaseTheWorld
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
+ * https://github.com/EaseTheWorld/EasyContentProvider
+ */
+
 package dev.easetheworld.easycontentprovider;
 
 import java.util.ArrayList;
@@ -23,15 +41,45 @@ public abstract class EasyContentProvider extends ContentProvider {
 	private UriOpsMatcher mUriOpsMatcher;
 	
 	/**
-	 * @return authority cannot be null.
+	 * This will be called only once in onCreate().
+	 * 
+	 * @return authority The authority of this provider. cannot be null.
 	 */
 	abstract protected String getAuthority();
 	
+	/**
+	 * This will be called only once in onCreate().
+	 * 
+	 * @return The array of UriOps for this provider
+	 */
 	abstract protected UriOps[] onCreateUriOps();
 	
+	/**
+	 * If you don't have to make your own SQLiteOpenHelper,
+	 * use this to manage db history and create/upgrade database easily.
+	 * Just add the modification of the db at the end of the array.
+	 * Make sure that you do not change the old history.
+	 * 
+	 * If you want to make your own SQLiteOpenHelper, just return null.
+	 * 
+	 * This will be called only once in onCreateSqLiteOpenHelper().
+	 * 
+	 * @return The array of the DatabaseHistory.
+	 */
 	abstract protected DatabaseHistory[] onCreateDatabaseHistory();
 	
-	// If subclass wants to make its own SQLiteOpenHelper, override this.
+	/**
+	 * If you want to take advantage of DatabaseHistory, don't override this.
+	 * Database name will be same as the name of provider.
+	 * 
+	 * If you want to make your own SQLiteOpenHelper, just override this without calling super
+	 * so that onCreateDatabaseHistory won't be called.
+	 * 
+	 * This will be called only once in onCreate().
+	 * 
+	 * @param context
+	 * @return
+	 */
 	protected SQLiteOpenHelper onCreateSQLiteOpenHelper(Context context) {
 		DatabaseHistory[] history = onCreateDatabaseHistory();
 		return new DatabaseHistoryBuilder(context, getClass().getSimpleName()+".db", history);
@@ -54,7 +102,7 @@ public abstract class EasyContentProvider extends ContentProvider {
 	}
 	
 	/**
-	 * This is like UriMatcher.match(uri) except this returns UriOps
+	 * This is like UriMatcher.match(uri) but this returns UriOps
 	 * 
 	 * @param uri
 	 * @return
@@ -63,6 +111,9 @@ public abstract class EasyContentProvider extends ContentProvider {
 		return mUriOpsMatcher.match(uri);
 	}
 	
+	/**
+	 * Inner class for uri-UriOps match
+	 */
 	private static class UriOpsMatcher {
 		private UriMatcher mUriMatcher;
 		private UriOps[] mUriOpsArray;
@@ -89,7 +140,11 @@ public abstract class EasyContentProvider extends ContentProvider {
 		}
 	}
 	
-	// default UriOps has no op except getType.
+	/**
+	 * This class has the operations which are matched to a uri.
+	 * default UriOps has no operation except getType() which is automatically generated based on uri.
+	 * If you want to set your own content type, use setType().
+	 */
 	public static class UriOps {
 		private String mUriPath;
 		
@@ -99,6 +154,9 @@ public abstract class EasyContentProvider extends ContentProvider {
 			return "#*".indexOf(s) >= 0;
 		}
 		
+		/**
+		 * @param uriPath uri(excluding authority) that matches this operations
+		 */
 		public UriOps(String uriPath) {
 			mUriPath = uriPath;
 			
@@ -153,20 +211,10 @@ public abstract class EasyContentProvider extends ContentProvider {
 		}
     }
 	
-	/*
-	 * authority should be available before onCreate, because it will be used in static class xxxTable's CONTENT_URI
-	private String getAuthority() {
-		try {
-			ComponentName cn = new ComponentName(getContext(), getClass());
-			ProviderInfo pi = getContext().getPackageManager().getProviderInfo(cn, 0);
-			return pi.authority;
-		} catch (NameNotFoundException e) {
-			e.printStackTrace();
-		}
-		return null;
-	}
-	*/
-
+	/**
+	 * If the UriOps matched with given uri implements OpQuery, this will call OpQuery.query()
+	 * The returned cursor will be set notification uri.
+	 */
 	@Override
 	public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
 		SQLiteDatabase db = mDbHelper.getReadableDatabase();
@@ -182,6 +230,10 @@ public abstract class EasyContentProvider extends ContentProvider {
 		return result;
 	}
 
+	/**
+	 * If the UriOps matched with given uri implements OpInsert, this will call OpInsert.insert()
+	 * This will call notify database change once.
+	 */
 	@Override
 	public Uri insert(Uri uri, ContentValues values) {
 		SQLiteDatabase db = mDbHelper.getWritableDatabase();
@@ -197,6 +249,10 @@ public abstract class EasyContentProvider extends ContentProvider {
 		return result;
 	}
 
+	/**
+	 * If the UriOps matched with given uri implements OpInsert, this will call OpInsert.bulkInsert()
+	 * This will call notify database change only once.
+	 */
 	@Override
 	public int bulkInsert(Uri uri, ContentValues[] values) {
 		SQLiteDatabase db = mDbHelper.getWritableDatabase();
@@ -212,6 +268,10 @@ public abstract class EasyContentProvider extends ContentProvider {
 		return result;
 	}
 
+	/**
+	 * If the UriOps matched with given uri implements OpUpdate, this will call OpUpdate.update()
+	 * This will call notify database change once.
+	 */
 	@Override
 	public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
 		SQLiteDatabase db = mDbHelper.getWritableDatabase();
@@ -227,6 +287,10 @@ public abstract class EasyContentProvider extends ContentProvider {
 		return result;
 	}
 	
+	/**
+	 * If the UriOps matched with given uri implements OpDelete, this will call OpDelete.delete()
+	 * This will call notify database change once.
+	 */
 	@Override
 	public int delete(Uri uri, String selection, String[] selectionArgs) {
 		SQLiteDatabase db = mDbHelper.getWritableDatabase();
@@ -249,6 +313,9 @@ public abstract class EasyContentProvider extends ContentProvider {
 	
 	private final ThreadLocal<Boolean> mApplyingBatch = new ThreadLocal<Boolean>();
 	
+	/**
+	 * This will call notify database change only once to increase performance.
+	 */
 	@Override
 	public ContentProviderResult[] applyBatch(
 			ArrayList<ContentProviderOperation> operations)
@@ -279,6 +346,10 @@ public abstract class EasyContentProvider extends ContentProvider {
 		return true;
 	}
 
+	/**
+	 * If your database need to be modified and increase version,
+	 * implement a DatabaseHistory and append it at the end of the DatabaseHistory array returned by onCreateDatabaseHistory().
+	 */
 	protected static interface DatabaseHistory {
 		void upgrade(SQLiteDatabase db);
 	}
