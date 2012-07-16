@@ -43,17 +43,18 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 	private String mTableName;
 	
 	/**
-	 * Simple constructor. 
-	 * @param uriPath uri(excluding authority) that matched to this operations. (assume table name is the first segment of the path)
+	 * Simple constructor.
+	 * Assume table name is the first segment of the path.
+	 * @param uriPath uri(excluding authority) that matched to this operations. 
 	 */
 	public BaseUriOps(String uriPath) {
 		this(uriPath, getFirstSegment(uriPath));
 	}
 	
 	/**
-	 * Constructor.
+	 * Normal Constructor.
 	 * @param uriPath uri(excluding authority) that matched to this operations.
-	 * @param tableName this is used for all db operations.
+	 * @param tableName this is used for all db operations. This can be sql select statements.
 	 */
 	public BaseUriOps(String uriPath, String tableName) {
 		super(uriPath);
@@ -78,7 +79,7 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 	 * To handle the uri including sub path segments like xxx/#/#.
 	 * Each '?' in selection will be matched to '#' or '*' in uri path.
 	 * @param selection
-	 * @return
+	 * @return this object to allow for chaining
 	 */
 	public BaseUriOps setUriSelection(String... selection) {
 		if (selection != null) {
@@ -111,7 +112,7 @@ public class BaseUriOps extends EasyContentProvider.UriOps implements
 	 * 
 	 * @param isReadable if true, query is allowed.
 	 * @param isWritable if true, insert/update/delete are allowed.
-	 * @return
+	 * @return this object to allow for chaining
 	 */
 	public BaseUriOps setPermission(boolean isReadable, boolean isWritable) {
 		mPermission = (isReadable ? PERMISSION_READ : 0) | (isWritable ? PERMISSION_WRITE : 0);

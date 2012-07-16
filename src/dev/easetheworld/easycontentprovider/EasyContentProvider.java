@@ -59,6 +59,7 @@ public abstract class EasyContentProvider extends ContentProvider {
 	 * use this to manage db history and create/upgrade database easily.
 	 * Just add the modification of the db at the end of the array.
 	 * Make sure that you do not change the old history.
+	 * The length of the array itself is the db version.
 	 * 
 	 * If you want to make your own SQLiteOpenHelper, just return null.
 	 * 
@@ -177,6 +178,10 @@ public abstract class EasyContentProvider extends ContentProvider {
 		
 		private String mType;
 		
+		/**
+		 * @param type
+		 * @return this object to allow for chaining
+		 */
 		public UriOps setType(String type) {
 			mType = type;
 			return this;
